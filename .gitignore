@@ -1,0 +1,24 @@
+# External git repos
+City4CFD/city4cfd/
+
+# Data files (do not commit)
+data/
+
+# Build artifacts
+build/
+*.o
+*.out
+*.exe
+
+# macOS
+.DS_Store
+
+# Editors / IDEs
+.vscode/
+.idea/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
