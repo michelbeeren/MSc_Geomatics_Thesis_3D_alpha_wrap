@@ -15,6 +15,8 @@ add_executable(alpha_wrap src/main.cpp
         src/val3dity.h
         src/alpha_wrap.cpp
         src/alpha_wrap.h
+        src/edge_refinement.cpp
+        src/edge_refinement.h
 )
 
 
