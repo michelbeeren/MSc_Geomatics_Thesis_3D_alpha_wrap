@@ -207,10 +207,10 @@ bool valid_file_boolean(const std::string& input_path)
     }
 
     if (is_valid) {
-        std::cout << "Mesh is VALID :)" << std::endl;
+        std::cout << "❤️❤️❤️Mesh is ✅VALID ✅ :) 😍😎👍🏼" << std::endl;
         return true;
     } else {
-        std::cout << "Mesh is INVALID :(" << std::endl;
+        std::cout << "⚠️⚠️⚠️ Mesh is ❌INVALID ❌ :( 👎🏼👎🏼👎🏼" << std::endl;
         return false;
     }
 }

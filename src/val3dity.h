@@ -13,9 +13,9 @@ using Point_3 = K::Point_3;
 using Mesh = CGAL::Surface_mesh<Point_3>;
 
 void write_cityjson_from_mesh(const Mesh& mesh, const std::string& filename);
-void write_off_from_mesh(const Mesh& mesh, const std::string& filename);
-void write_obj_from_mesh(const Mesh& mesh, const std::string& filename);
-bool check_report_for_validity(const std::string& report_path);
+bool report_is_valid(const std::string& report_path);
+bool run_val3dity_and_check(const std::string& input_path, const std::string& report_path, const std::string& primitive = "");
 bool valid_mesh_boolean(const Mesh& mesh_);
+bool valid_file_boolean(const std::string& input_path);
 
 #endif //THESIS_VAL3DITY_H

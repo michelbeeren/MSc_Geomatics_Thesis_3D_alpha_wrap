@@ -13,6 +13,8 @@ find_package(CGAL REQUIRED)
 add_executable(alpha_wrap src/main.cpp
         src/val3dity.cpp
         src/val3dity.h
+        src/alpha_wrap.cpp
+        src/alpha_wrap.h
 )
 
 
