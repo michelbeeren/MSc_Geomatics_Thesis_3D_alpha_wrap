@@ -1,54 +1,30 @@
+// ========================== INCLUDE STUFF ===============================
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
 #include <map>
-#include <set>
-
 #include <CGAL/alpha_wrap_3.h>
-#include <CGAL/Polygon_mesh_processing/bbox.h>
 #include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
 #include <CGAL/Real_timer.h>
 #include <CGAL/Polygon_mesh_processing/compute_normal.h>
-
 #include <CGAL/AABB_tree.h>
 #include <CGAL/AABB_face_graph_triangle_primitive.h>
 #include <CGAL/AABB_traits.h>
 #include <CGAL/Object.h>
 #include <CGAL/boost/graph/helpers.h>
-
-#include <boost/optional.hpp>
 #include <boost/variant/get.hpp>
-
 #include <iostream>
 #include <string>
 #include <filesystem>
-
-#include <CGAL/Side_of_triangle_mesh.h>
-#include <CGAL/boost/graph/Euler_operations.h>
-#include <CGAL/Random.h>
-#include <CGAL/IO/PLY.h>
 #include <CGAL/Surface_mesh/IO/PLY.h>
-#include <limits>
 #include <CGAL/IO/Color.h>
-#include <limits>
-#include <CGAL/IO/Color.h>
-#include <CGAL/AABB_tree.h>
-#include <CGAL/AABB_face_graph_triangle_primitive.h>
-#include <CGAL/AABB_traits.h>
+#include <fstream>
+#include <vector>
 
-#include <boost/variant/get.hpp>
-#include "val3dity.h"
-#include "alpha_wrap.h"
-#include "edge_refinement.h"
-#include "octree.h"
-
-// random
-
+// ========================= NAMESPACES/USING =============================
 namespace PMP = CGAL::Polygon_mesh_processing;
-
 using K = CGAL::Exact_predicates_inexact_constructions_kernel;
 using Point_3 = K::Point_3;
 using Vector_3 = K::Vector_3;
-
 using Mesh = CGAL::Surface_mesh<Point_3>;
 using face_descriptor = Mesh::Face_index;
 using Ray_3   = K::Ray_3;
@@ -57,11 +33,7 @@ using Primitive   = CGAL::AABB_face_graph_triangle_primitive<Mesh>;
 using AABB_traits = CGAL::AABB_traits<K, Primitive>;
 using Tree        = CGAL::AABB_tree<AABB_traits>;
 
-#include <fstream>
-#include <unordered_map>
-#include <vector>
-#include <iomanip>
-
+// ============================= STRUCTS ===================================
 struct OctreeCell {
     CGAL::Bbox_3 bbox;
     int depth = 0;
@@ -77,13 +49,19 @@ struct LeafCell {
     CGAL::Bbox_3 bbox;
 };
 
-// ----------------------------------------------------------------------------------
-// -------------------------------------MAIN-----------------------------------------
-// ----------------------------------------------------------------------------------
+// ====================== OWN CREATED HEADERS ==============================
+#include "val3dity.h"
+#include "alpha_wrap.h"
+#include "edge_refinement.h"
+#include "octree.h"
+
+// ==================================================================================
+// ==================================== MAIN ========================================
+// ==================================================================================
 int main(int argc, char** argv)
 {
   // Read the input
-  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Test_3D_Alphawrap/Input/demo/joep_huis.off");
+  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Input/3DBAG_Buildings/joep_huis.off");
     std::cout << "------------------------------------------------------------" << std::endl;
   std::cout << "Reading input: " << filename << std::endl;
     // demo 1
@@ -97,27 +75,12 @@ int main(int argc, char** argv)
     std::filesystem::path p(output_name);
     std::filesystem::create_directory(p.parent_path());
 
-    // mesh the input
-    Mesh mesh;
-    if(!PMP::IO::read_polygon_mesh(filename, mesh) || is_empty(mesh) || !is_triangle_mesh(mesh))
-    {
-        //
-        return EXIT_FAILURE;
-    }
-
-    std::map<Mesh::Face_index, K::Vector_3> face_normals;
-
-    CGAL::Polygon_mesh_processing::compute_face_normals(
-        mesh,
-        boost::make_assoc_property_map(face_normals)
-    );
-
-
-    Tree tree(faces(mesh).begin(), faces(mesh).end(), mesh);
-    tree.accelerate_distance_queries();
+    // ---------------------------Mesh the input (optional: compute normals and tree)----------------------------------
+    auto data = mesh_input(filename, true, true); // set both to false if you do not want to compute normals + tree
+    Mesh& mesh = data.mesh;
+    Tree& tree = *data.tree;
 
     // ----------------------------IS MESH VALID?------------------------------------
-    // std::cout << "Testing if input mesh is valid:" << std::endl;
     valid_mesh_boolean(mesh);
     std::cout << "------------------------------------------------------------" << std::endl;
 
@@ -134,7 +97,7 @@ int main(int argc, char** argv)
     // demo 3
         // ----------------- SHARPENING EDGES --------------------
     std::string weight_output_wrap =
-        "../data/Test_3D_Alphawrap/Output/demo/refined.ply";
+        "../data/Output/demo/refined.ply";
     // std::string weight_output_inner_wrap =
     //     "../data/Test_3D_Alphawrap/Output/3DBAG_Buildings/d_innerwrap_input_bk.ply";
 
@@ -166,7 +129,7 @@ int main(int argc, char** argv)
       }
     }
     std::string refining =
-    "../data/Test_3D_Alphawrap/Output/demo/sharpe_concave_corners.ply";
+    "../data/Output/demo/sharpe_concave_corners.ply";
     Mesh refined_edges = refine_round_edges(distance_alpha, offset_input);
     t.stop();
     std::cout << "Took " << t.time() << " s." << std::endl;
@@ -243,7 +206,7 @@ int main(int argc, char** argv)
     // std::cout << "Leaf cells: " << cubes2.size() << std::endl; // can also use 'leaves_all' or 'leaves' or 'cubes'
     //
     // // Write .off wireframe file
-    // std::string octree_refinement = "../data/Test_3D_Alphawrap/Output/3DBAG_Buildings/Octree_refinement.off";
+    // std::string octree_refinement = "../data/Output/3DBAG_Buildings/Octree_refinement.off";
     //
     // write_off_wireframe(cubes2, octree_refinement); // can also use 'leaves_all' or 'leaves' or 'cubes'
     //

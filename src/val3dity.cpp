@@ -146,7 +146,7 @@ bool run_val3dity_and_check(const std::string& input_path, const std::string& re
 bool valid_mesh_boolean(const Mesh& mesh_)
 {
     const std::string base =
-        "../data/Test_3D_Alphawrap/Output/val3dity_check/";
+        "../data/Output/val3dity_check/";
 
     const std::string cityjson_path = base + "check_me.json";
     const std::string obj_path      = base + "check_me.obj";
@@ -182,7 +182,7 @@ bool valid_mesh_boolean(const Mesh& mesh_)
 bool valid_file_boolean(const std::string& input_path)
 {
     const std::string report_path =
-        "../data/Test_3D_Alphawrap/Output/val3dity_check/report.json";
+        "../data/Output/val3dity_check/report.json";
 
     // detect extension
     std::string ext;

@@ -8,16 +8,68 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
 #include <vector>
-#include <iomanip>
 #include <CGAL/Polygon_mesh_processing/bbox.h>
 #include <CGAL/Real_timer.h>
 #include <CGAL/alpha_wrap_3.h>
+#include <map>
+#include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
+#include <CGAL/Polygon_mesh_processing/compute_normal.h>
+#include <CGAL/AABB_tree.h>
+#include <CGAL/AABB_face_graph_triangle_primitive.h>
+#include <CGAL/AABB_traits.h>
+#include <CGAL/boost/graph/helpers.h>
+#include <boost/variant/get.hpp>
+#include <CGAL/IO/Color.h>
 
+namespace PMP = CGAL::Polygon_mesh_processing;
 using K = CGAL::Exact_predicates_inexact_constructions_kernel;
 using Point_3 = K::Point_3;
 using Mesh = CGAL::Surface_mesh<Point_3>;
+using Point_3 = K::Point_3;
+using Vector_3 = K::Vector_3;
+using Segment_3 = K::Segment_3;
+using Primitive   = CGAL::AABB_face_graph_triangle_primitive<Mesh>;
+using AABB_traits = CGAL::AABB_traits<K, Primitive>;
+using Tree        = CGAL::AABB_tree<AABB_traits>;
 
 #include "alpha_wrap.h"
+
+// --------------------------------------MESH INPUT-------------------------------------
+MeshData mesh_input(const std::string& filename, bool compute_normals, bool build_tree)
+{
+    MeshData out;
+
+    if (!CGAL::Polygon_mesh_processing::IO::read_polygon_mesh(filename, out.mesh) ||
+        CGAL::is_empty(out.mesh) ||
+        !CGAL::is_triangle_mesh(out.mesh))
+    {
+        throw std::runtime_error("Failed to read mesh: " + filename);
+    }
+
+    if (compute_normals) {
+        CGAL::Polygon_mesh_processing::compute_face_normals(
+            out.mesh,
+            boost::make_assoc_property_map(out.face_normals)
+        );
+    }
+
+    if (build_tree) {
+        out.tree = std::make_unique<Tree>(
+            faces(out.mesh).begin(),
+            faces(out.mesh).end(),
+            out.mesh
+        );
+        out.tree->accelerate_distance_queries();
+
+        // defensive check (should never trigger, but matches your wish)
+        if (!out.tree) {
+            throw std::runtime_error("Tree not built for: " + filename);
+        }
+    }
+
+    std::cout << "Input file successfully meshed" << std::endl;
+    return out;
+}
 
 // --------------------------------------ALPHA WRAP-------------------------------------
 // generate output name
