@@ -10,11 +10,10 @@ include_directories(
 
 find_package(CGAL REQUIRED)
 
-add_executable(alpha_wrap_example 3D_alpha_wrap.cpp)
-add_executable(main_example main.cpp)
+add_executable(alpha_wrap src/main.cpp)
 
 
-target_link_libraries(alpha_wrap_example CGAL::CGAL)
+target_link_libraries(alpha_wrap CGAL::CGAL)
 
 #val3dity
 find_program(VAL3DITY_EXECUTABLE val3dity /opt/homebrew/bin)
