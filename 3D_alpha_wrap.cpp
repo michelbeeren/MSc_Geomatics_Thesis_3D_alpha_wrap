@@ -1687,12 +1687,12 @@ void collect_intersecting_leaves_verified( const OctreeCell& cell, const Tree& t
 int main(int argc, char** argv)
 {
   // Read the input
-  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Test_3D_Alphawrap/Input/3DBAG_Buildings/joep_huis.off");
+  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Test_3D_Alphawrap/Input/demo/joep_huis.off");
     std::cout << "------------------------------------------------------------" << std::endl;
   std::cout << "Reading input: " << filename << std::endl;
-
-  const double relative_alpha = 1000.; //2000. //20.
-  const double relative_offset = 12000.; // 7000. //600.
+    // demo 1
+  const double relative_alpha = 70.; //2000. //20. //1000.
+  const double relative_offset = 1500.; // 7000. //600. //12000.
 
 
     // create output name (+ folder if folder does not exist)
@@ -1720,80 +1720,140 @@ int main(int argc, char** argv)
     Tree tree(faces(mesh).begin(), faces(mesh).end(), mesh);
     tree.accelerate_distance_queries();
 
-    // -------------------------------OCTREE REFINEMENT---------------------------
-    // Create root octree cell
-    OctreeCell root;
-    // compute bbox
-    CGAL::Bbox_3 tight = CGAL::Polygon_mesh_processing::bbox(mesh);
-
-    // Center
-    double cx = 0.5 * (tight.xmin() + tight.xmax());
-    double cy = 0.5 * (tight.ymin() + tight.ymax());
-    double cz = 0.5 * (tight.zmin() + tight.zmax());
-
-    // Largest half-extent
-    double half = std::max({
-        0.5 * (tight.xmax() - tight.xmin()),
-        0.5 * (tight.ymax() - tight.ymin()),
-        0.5 * (tight.zmax() - tight.zmin())
-    });
-
-    // Optional looseness
-    half *= 1.1;
-
-    // TRUE cube
-    root.bbox = CGAL::Bbox_3(
-        cx - half, cy - half, cz - half,
-        cx + half, cy + half, cz + half
-    );
-    root.depth = 0;
-
-    // Run Octree refinement
-    refine_cell(root, tree, face_normals);
-
-    // Collect all leaf cells
-    std::vector<LeafCell> leaves_all; // use these if you want all cubes
-    collect_leaves(root, leaves_all);
-
-    // Collect leaf cells that intersect the input
-    std::vector<LeafCell> leaves;
-    collect_intersecting_leaves(root, leaves);
-
-    // Collect finest level of detail leaves
-    int finest_depth = 0;
-    find_max_intersecting_leaf_depth(root, finest_depth);
-
-    std::vector<LeafCell> cubes;
-    collect_finest_intersecting_leaves(root, finest_depth, cubes);
-
-    // collect intersecting cubes 2.0
-    std::vector<LeafCell> cubes2;
-    collect_intersecting_leaves_verified(root, tree, cubes2);
-
-    std::cout << "Leaf cells: " << cubes2.size() << std::endl; // can also use 'leaves_all' or 'leaves' or 'cubes'
-
-    // Write .off wireframe file
-    std::string octree_refinement = "../data/Test_3D_Alphawrap/Output/3DBAG_Buildings/Octree_refinement.off";
-
-    write_off_wireframe(cubes2, octree_refinement); // can also use 'leaves_all' or 'leaves' or 'cubes'
-
-    std::cout << "Octree wireframe written to:\n"
-              << octree_refinement << std::endl;
-
     // ----------------------------IS MESH VALID?------------------------------------
     // std::cout << "Testing if input mesh is valid:" << std::endl;
     valid_mesh_boolean(mesh);
     std::cout << "------------------------------------------------------------" << std::endl;
 
+    // demo 2
+    // ------------------ ALPHA WRAP FROM THE OUTSIDE-----------------------------
+    std::cout << "-----------------3D ALPHA WRAPPING THE INPUT:-------------" << std::endl;
+    Mesh alpha_wrap = _3D_alpha_wrap( output_name,relative_alpha,relative_offset, mesh);
 
-  //   // ------------------ ALPHA WRAP FROM THE OUTSIDE-----------------------------
-  //   std::cout << "-----------------3D ALPHA WRAPPING THE INPUT:-------------" << std::endl;
-  // Mesh alpha_wrap = _3D_alpha_wrap( output_name,relative_alpha,relative_offset, mesh);
+    // is mesh valid?
+    std::cout << "Testing if 3D alpha wrapped mesh is valid:" << std::endl;
+    valid_mesh_boolean(alpha_wrap);
+    std::cout << "------------------------------------------------------------" << std::endl;
 
-    // // is mesh valid?
-    // std::cout << "Testing if 3D alpha wrapped mesh is valid:" << std::endl;
-    // valid_mesh_boolean(alpha_wrap);
-    // std::cout << "------------------------------------------------------------" << std::endl;
+    // demo 3
+        // ----------------- SHARPENING EDGES --------------------
+    std::string weight_output_wrap =
+        "../data/Test_3D_Alphawrap/Output/demo/refined.ply";
+    // std::string weight_output_inner_wrap =
+    //     "../data/Test_3D_Alphawrap/Output/3DBAG_Buildings/d_innerwrap_input_bk.ply";
+
+    // // offset wrapped from inside mesh
+    double _2_offset = rel_offset_to_offset(mesh, relative_offset);
+    double offset = (rel_offset_to_offset(mesh, relative_offset))/2;
+    // Mesh offset_inner_wrap = offset_mesh(alpha_inside_wrap, _2_offset);
+    // std::cout << "Succesfully offsetted wrapped from inside mesh" << std::endl;
+
+    Mesh offset_input = offset_mesh(mesh, offset);
+
+    // tag + colorise outer wrap
+    CGAL::Real_timer t;
+    t.start();
+    Mesh distance_alpha = add_midpoint_distance_tag(alpha_wrap, offset_input, 220);
+    // std::cout << "Succesfully adding midpoint distance to alpha wrap mesh" << std::endl;
+
+    // std::cout << "Writing to " << weight_output_wrap << std::endl;
+    {
+      std::ofstream out(weight_output_wrap, std::ios::binary);
+      if (!out) {
+          std::cerr << "Cannot open " << weight_output_wrap << " for writing\n";
+      } else {
+          CGAL::IO::write_PLY(
+              out,
+              distance_alpha,
+              CGAL::parameters::stream_precision(17)
+          );
+      }
+    }
+    std::string refining =
+    "../data/Test_3D_Alphawrap/Output/demo/sharpe_concave_corners.ply";
+    Mesh refined_edges = refine_round_edges(distance_alpha, offset_input);
+    t.stop();
+    std::cout << "Took " << t.time() << " s." << std::endl;
+    std::cout << "Succesfully refined edges" << std::endl;
+
+    std::cout << "Writing to " << refining << std::endl;
+    {
+      std::ofstream out(refining, std::ios::binary);
+      if (!out) {
+          std::cerr << "Cannot open " << refining << " for writing\n";
+      } else {
+          CGAL::IO::write_PLY(
+              out,
+              refined_edges,
+              CGAL::parameters::stream_precision(17)
+          );
+      }
+    }
+    // ----------------------------IS MESH VALID?------------------------------------
+    // std::cout << "Testing if input mesh is valid:" << std::endl;
+    valid_mesh_boolean(refined_edges);
+    std::cout << "------------------------------------------------------------" << std::endl;
+
+    // // -------------------------------OCTREE REFINEMENT---------------------------
+    // // Create root octree cell
+    // OctreeCell root;
+    // // compute bbox
+    // CGAL::Bbox_3 tight = CGAL::Polygon_mesh_processing::bbox(mesh);
+    //
+    // // Center
+    // double cx = 0.5 * (tight.xmin() + tight.xmax());
+    // double cy = 0.5 * (tight.ymin() + tight.ymax());
+    // double cz = 0.5 * (tight.zmin() + tight.zmax());
+    //
+    // // Largest half-extent
+    // double half = std::max({
+    //     0.5 * (tight.xmax() - tight.xmin()),
+    //     0.5 * (tight.ymax() - tight.ymin()),
+    //     0.5 * (tight.zmax() - tight.zmin())
+    // });
+    //
+    // // Optional looseness
+    // half *= 1.1;
+    //
+    // // TRUE cube
+    // root.bbox = CGAL::Bbox_3(
+    //     cx - half, cy - half, cz - half,
+    //     cx + half, cy + half, cz + half
+    // );
+    // root.depth = 0;
+    //
+    // // Run Octree refinement
+    // refine_cell(root, tree, face_normals);
+    //
+    // // Collect all leaf cells
+    // std::vector<LeafCell> leaves_all; // use these if you want all cubes
+    // collect_leaves(root, leaves_all);
+    //
+    // // Collect leaf cells that intersect the input
+    // std::vector<LeafCell> leaves;
+    // collect_intersecting_leaves(root, leaves);
+    //
+    // // Collect finest level of detail leaves
+    // int finest_depth = 0;
+    // find_max_intersecting_leaf_depth(root, finest_depth);
+    //
+    // std::vector<LeafCell> cubes;
+    // collect_finest_intersecting_leaves(root, finest_depth, cubes);
+    //
+    // // collect intersecting cubes 2.0
+    // std::vector<LeafCell> cubes2;
+    // collect_intersecting_leaves_verified(root, tree, cubes2);
+    //
+    // std::cout << "Leaf cells: " << cubes2.size() << std::endl; // can also use 'leaves_all' or 'leaves' or 'cubes'
+    //
+    // // Write .off wireframe file
+    // std::string octree_refinement = "../data/Test_3D_Alphawrap/Output/3DBAG_Buildings/Octree_refinement.off";
+    //
+    // write_off_wireframe(cubes2, octree_refinement); // can also use 'leaves_all' or 'leaves' or 'cubes'
+    //
+    // std::cout << "Octree wireframe written to:\n"
+    //           << octree_refinement << std::endl;
+
 
 
   // // ------------------ ALPHA WRAP FROM THE INSIDE -----------------------
@@ -1805,59 +1865,7 @@ int main(int argc, char** argv)
     // valid_mesh_boolean(alpha_inside_wrap);
   // std::cout << "------------------------------------------------------------" << std::endl;
 
-    // // ----------------- COMBINING INSIDE AND OUTSIDE MESH --------------------
-    // std::string weight_output_wrap =
-    //     "../data/Test_3D_Alphawrap/Output/3DBAG_Buildings/d_wrap_input_bk.ply";
-    // std::string weight_output_inner_wrap =
-    //     "../data/Test_3D_Alphawrap/Output/3DBAG_Buildings/d_innerwrap_input_bk.ply";
 
-    // // offset wrapped from inside mesh
-    // double _2_offset = rel_offset_to_offset(mesh, relative_offset);
-    // double offset = (rel_offset_to_offset(mesh, relative_offset))/2;
-    // Mesh offset_inner_wrap = offset_mesh(alpha_inside_wrap, _2_offset);
-    // std::cout << "Succesfully offsetted wrapped from inside mesh" << std::endl;
-    //
-    // Mesh offset_input = offset_mesh(mesh, offset);
-
-    // // tag + colorise outer wrap
-    // CGAL::Real_timer t;
-    // t.start();
-    // Mesh distance_alpha = add_midpoint_distance_tag(alpha_wrap, offset_input, 220);
-    // // std::cout << "Succesfully adding midpoint distance to alpha wrap mesh" << std::endl;
-    //
-    // // std::cout << "Writing to " << weight_output_wrap << std::endl;
-    // {
-    //   std::ofstream out(weight_output_wrap, std::ios::binary);
-    //   if (!out) {
-    //       std::cerr << "Cannot open " << weight_output_wrap << " for writing\n";
-    //   } else {
-    //       CGAL::IO::write_PLY(
-    //           out,
-    //           distance_alpha,
-    //           CGAL::parameters::stream_precision(17)
-    //       );
-    //   }
-    // }
-    // std::string refining =
-    // "../data/Test_3D_Alphawrap/Output/3DBAG_Buildings/refined_good_bk.ply";
-    // Mesh refined_edges = refine_round_edges(distance_alpha, offset_input);
-    // t.stop();
-    // std::cout << "Took " << t.time() << " s." << std::endl;
-    // std::cout << "Succesfully refined edges" << std::endl;
-    //
-    // std::cout << "Writing to " << refining << std::endl;
-    // {
-    //   std::ofstream out(refining, std::ios::binary);
-    //   if (!out) {
-    //       std::cerr << "Cannot open " << refining << " for writing\n";
-    //   } else {
-    //       CGAL::IO::write_PLY(
-    //           out,
-    //           refined_edges,
-    //           CGAL::parameters::stream_precision(17)
-    //       );
-    //   }
-    // }
     //
     // // tag + colorise inner wrap
     // Mesh distance_alpha_inner = add_midpoint_distance_tag(offset_inner_wrap, offset_input, 220);

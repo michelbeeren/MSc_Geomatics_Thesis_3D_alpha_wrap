@@ -13,6 +13,8 @@
 //                 Andreas Fabri
 //                 Michael Hemmer
 //
+#warning "USING LOCAL MODIFIED ALPHA WRAP HEADERS"
+#pragma message("USING LOCAL MODIFIED ALPHA WRAP (CLION)")
 #ifndef CGAL_ALPHA_WRAP_3_INTERNAL_ALPHA_WRAP_3_H
 #define CGAL_ALPHA_WRAP_3_INTERNAL_ALPHA_WRAP_3_H
 
@@ -174,6 +176,7 @@ private:
 protected:
   Oracle m_oracle;
   SC_Iso_cuboid_3 m_bbox;
+  double m_xmid = 0.0, m_ymid = 0.0, m_zmid = 0.0;
 
   FT m_alpha = FT(-1), m_sq_alpha = FT(-1);
   FT m_offset = FT(-1), m_sq_offset = FT(-1);
@@ -245,6 +248,7 @@ public:
   template <typename OutputMesh,
             typename InputNamedParameters = parameters::Default_named_parameters,
             typename OutputNamedParameters = parameters::Default_named_parameters>
+  // -----------------actual 3D alpha wrap algorithm-----------------------------
   void operator()(const double alpha, // = default_alpha()
                   const double offset, // = alpha / 30.
                   OutputMesh& output_mesh,
@@ -257,12 +261,12 @@ public:
     using parameters::get_parameter_reference;
     using parameters::choose_parameter;
 
-    //
+    // how vertex coordinats are stored in output_mesh
     using OVPM = typename CGAL::GetVertexPointMap<OutputMesh, OutputNamedParameters>::type;
     OVPM ovpm = choose_parameter(get_parameter(out_np, internal_np::vertex_point),
                                  get_property_map(vertex_point, output_mesh));
 
-    //
+    // receives callbacks and is used for progress reporting, interruption, logging, ...
     using Visitor = typename internal_np::Lookup_named_param_def<
                       internal_np::visitor_t,
                       InputNamedParameters,
@@ -309,8 +313,10 @@ public:
     t.start();
 #endif
 
+    // --------------3D alpha wrap algorithm actually begins----------
     visitor.on_alpha_wrapping_begin(*this);
 
+    // initialise: compute offset surface, insert points, builds or updates 3D triangulation
     if(!initialize(alpha, offset, refining))
       return;
 
@@ -325,6 +331,7 @@ public:
     dump_triangulation_faces("starting_wrap.off", true /*only_boundary_faces*/);
 #endif
 
+    // tetrahedracells are labeled inside/outside (based on alpha treshhold and intersection?) --> so probably need to change parts here
     alpha_flood_fill(visitor);
 
 #ifdef CGAL_AW3_DEBUG_DUMP_INTERMEDIATE_WRAPS
@@ -383,6 +390,16 @@ public:
 #endif
 
     visitor.on_alpha_wrapping_end(*this);
+    std::cout << "ooh managed to modify the alpha wrap algorithm :)" << std::endl;
+    std::cout << "xmid = " << m_xmid << std::endl;
+    std::cout << "ymid = " << m_ymid << std::endl;
+    std::cout << "zmid = " << m_zmid << std::endl;
+    std::cout << "xmin = " << m_oracle.bbox().xmin() << std::endl;
+    std::cout << "ymin = " << m_oracle.bbox().ymin() << std::endl;
+    std::cout << "zmin = " << m_oracle.bbox().zmin() << std::endl;
+    std::cout << "xmax = " << m_oracle.bbox().xmax() << std::endl;
+    std::cout << "ymax = " << m_oracle.bbox().ymax() << std::endl;
+    std::cout << "zmax = " << m_oracle.bbox().zmax() << std::endl;
   }
 
   // Convenience overloads
@@ -446,6 +463,10 @@ private:
   void insert_bbox_corners()
   {
     m_bbox = construct_bbox(CGAL::to_double(m_offset));
+
+    m_xmid = 0.5 * (m_bbox.xmin() + m_bbox.xmax());
+    m_ymid = 0.5 * (m_bbox.ymin() + m_bbox.ymax());
+    m_zmid = 0.5 * (m_bbox.zmin() + m_bbox.zmax());
 
 #ifdef CGAL_AW3_DEBUG_INITIALIZATION
     std::cout << "Insert Bbox vertices" << std::endl;
@@ -891,10 +912,48 @@ public:
   }
 
 private:
+  // ooh I think I just need to change this a bit :)
+
+  // bool is_traversable(const Facet& f) const { return less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr); }
+
+  // demo 3
   bool is_traversable(const Facet& f) const
   {
-    return less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
+    // --- compute facet midpoint ---
+    const Cell_handle ch = f.first;
+    const int i = f.second;
+
+    const Point_3& p0 = ch->vertex((i+1)&3)->point();
+    const Point_3& p1 = ch->vertex((i+2)&3)->point();
+    const Point_3& p2 = ch->vertex((i+3)&3)->point();
+
+    const Point_3 f_mid(
+      (p0.x() + p1.x() + p2.x()) / 3.0,
+      (p0.y() + p1.y() + p2.y()) / 3.0,
+      (p0.z() + p1.z() + p2.z()) / 3.0
+    );
+
+    // --- classify using PRECOMPUTED mid-planes ---
+    const bool left   = CGAL::to_double(f_mid.x()) < m_xmid;
+    const bool bottom = CGAL::to_double(f_mid.y()) < m_ymid;
+    const bool front  = CGAL::to_double(f_mid.z()) < m_zmid;
+
+    double local_alpha = CGAL::to_double(m_alpha);
+
+    if ( left &&  bottom &&  front) local_alpha = CGAL::to_double(m_alpha) * 2.0;
+    if ( left &&  bottom && !front) local_alpha = CGAL::to_double(m_alpha) * 4.0;
+    if ( left && !bottom &&  front) local_alpha = CGAL::to_double(m_alpha);
+    if ( left && !bottom && !front) local_alpha = CGAL::to_double(m_alpha) * 0.5;
+    if (!left &&  bottom &&  front) local_alpha = CGAL::to_double(m_alpha) * 6.0;
+    if (!left &&  bottom && !front) local_alpha = CGAL::to_double(m_alpha) * 1.5;
+    if (!left && !bottom &&  front) local_alpha = CGAL::to_double(m_alpha) / 3.0;
+    if (!left && !bottom && !front) local_alpha = CGAL::to_double(m_alpha) * 5.0;
+
+    const FT local_sq_alpha = FT(local_alpha * local_alpha);
+
+    return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
   }
+
 
   bool compute_steiner_point(const Cell_handle ch,
                              const Cell_handle neighbor,
@@ -1170,6 +1229,11 @@ private:
     m_offset = FT(offset);
     m_sq_offset = square(m_offset);
 
+    const Bbox_3 ib = m_oracle.bbox();
+    m_xmid = 0.5 * (ib.xmin() + ib.xmax());
+    m_ymid = 0.5 * (ib.ymin() + ib.ymax());
+    m_zmid = 0.5 * (ib.zmin() + ib.zmax());
+
     // Resuming means that we do not need to re-initialize the queue: either we have finished
     // and there is nothing to do, or the interruption was due to a user callback in the visitor,
     // and we can resume with the current queue
@@ -1211,6 +1275,13 @@ private:
   }
 
   template <typename Visitor>
+
+// ooh found the alpha flood fill function :)
+  // this function starts after initialisation
+  //    -> builds/updates 3D triangulation
+  //    -> computes offset surface
+  //    -> inserts points
+  //    -> prepares data structures
   bool alpha_flood_fill(Visitor& visitor)
   {
 #ifdef CGAL_AW3_DEBUG
@@ -1220,6 +1291,8 @@ private:
     visitor.on_flood_fill_begin(*this);
 
     // Explore all finite cells that are reachable from one of the initial outside cells.
+    // 1 iteration per gate (gate = facet that has on one side a OUTSIDE and on the other side a INSIDE tetrahedral cell)
+    // loop trhough these gates till this 'gate list' is empty
     while(!m_queue.empty())
     {
       if(!visitor.go_further(*this))
@@ -1230,9 +1303,11 @@ private:
 #endif
 
       // const& to something that will be popped, but safe as `ch` && `id` are extracted before the pop
+      // take highest priority gate (safest first -> based on alpha, istance, offset, etc.?)
       const Gate& gate = m_queue.top();
 
 #ifndef CGAL_AW3_USE_SORTED_PRIORITY_QUEUE
+      // face is no longer a valid gate; e.g. now both sides outside, or things changed after Steiner Point insertion
       if(gate.is_zombie())
       {
         m_queue.pop();
@@ -1240,14 +1315,17 @@ private:
       }
 #endif
 
+      // extract the facet and its two incident cells
       const Facet& f = gate.facet();
       CGAL_precondition(!m_tr.is_infinite(f));
 
-      const Cell_handle ch = f.first;
-      const int s = f.second;
+      // 'ch' must be OUTSIDE
+      const Cell_handle ch = f.first; // 'ch' = OUTSIDE cell on one side of the facet
+      const int s = f.second; // 'nh' = cell on other side
       CGAL_precondition(ch->is_outside());
 
-      const Cell_handle nh = ch->neighbor(s);
+      const Cell_handle nh = ch->neighbor(s); // 'nh' is neighbor of 'ch' (they share a triangular face)
+      // 'nh' must be labeled inside or outside (zombie) -> later popped
       CGAL_precondition(nh->label() == Cell_label::INSIDE || nh->label() == Cell_label::OUTSIDE);
 
 #ifdef CGAL_AW3_DEBUG_QUEUE
@@ -1277,10 +1355,12 @@ private:
       face_out.close();
 #endif
 
+      // gate can be procesed and popped from the queue
       visitor.before_facet_treatment(*this, gate);
 
       m_queue.pop();
 
+      // Infinite cells per definition OUTSIDE
       if(m_tr.is_infinite(nh))
       {
         nh->set_label(Cell_label::OUTSIDE);
@@ -1290,22 +1370,36 @@ private:
         continue;
       }
 
+      // if compute_steiner_point returns true:
+      //    -> non traversal cell: insert a steiner point
       Point_3 steiner_point;
       if(compute_steiner_point(ch, nh, steiner_point))
       {
 //        std::cout << CGAL::abs(CGAL::approximate_sqrt(m_oracle.squared_distance(steiner_point)) - m_offset)
 //                  << " vs " << 1e-2 * m_offset << std::endl;
+        // for steiner point insertion, looks if steiner point is 'near enough' the offset surface
+        // so actually just a sanity check if they inserted steiner point good enough
+        //    -> e.g. floating point error
         CGAL_assertion(CGAL::abs(CGAL::approximate_sqrt(m_oracle.squared_distance(steiner_point)) - m_offset) <= 1e-2 * m_offset);
 
+        // first destroy conflicting cells caused by the steiner point insertion
         // locate cells that are going to be destroyed and remove their facet from the queue
         int li, lj = 0;
+        // multiple options for lt:
+        //    -> lt == CELL -> steiner point lies inside cell
+        //        -> insertion splits tetrahedron into 4 new tetrahedra
+        //    -> lt == FACET -> steiner point lies on triangular face, li used (face index (0-3))
+        //        -> point lies on face li of this tetrahedron
+        //    -> lt == EDGE -> steiner point lies on edge, li and lj used
+        //        -> point lies on the edge between vertices li and lj
+        //    -> lt == VERTEX -> FORBIDDEN
         Locate_type lt;
         const Cell_handle conflict_cell = m_tr.locate(steiner_point, lt, li, lj, nh);
         CGAL_assertion(lt != Triangulation::VERTEX);
 
         // Using small vectors like in Triangulation_3 does not bring any runtime improvement
-        std::vector<Facet> boundary_facets;
-        std::vector<Cell_handle> conflict_zone;
+        std::vector<Facet> boundary_facets; // = boundary between conflict zone and the rest
+        std::vector<Cell_handle> conflict_zone; // = tetrahedra whose circumspheres contain the new point -> will be removed
         boundary_facets.reserve(32);
         conflict_zone.reserve(32);
 
@@ -1336,9 +1430,10 @@ private:
 
         visitor.before_Steiner_point_insertion(*this, steiner_point);
 
-        // Actual insertion of the Steiner point
+        // Actual insertion of the Steiner point :)
         // We could use TDS functions to avoid recomputing the conflict zone, but in practice
         // it does not bring any runtime improvements
+        // also passes lt, li, lj
         Vertex_handle vh = m_tr.insert(steiner_point, lt, conflict_cell, li, lj);
         vh->type() = AW3i::Vertex_type:: DEFAULT;
 
@@ -1347,6 +1442,7 @@ private:
         std::vector<Cell_handle> new_cells;
         new_cells.reserve(32);
         m_tr.incident_cells(vh, std::back_inserter(new_cells));
+        // label new inserted cells: infinite OUTSIDE, otherwise INSIDE
         for(const Cell_handle& new_ch : new_cells)
         {
           // std::cout << "new cell has time stamp " << new_ch->time_stamp() << std::endl;
@@ -1362,6 +1458,7 @@ private:
         {
           for(int i=0; i<4; ++i)
           {
+            // ensure ch is outside cell
             if(m_tr.is_infinite(new_ch, i))
               continue;
 
@@ -1379,12 +1476,14 @@ private:
       }
       else // no need for a Steiner point, carve through and continue
       {
+        // gate is traversal -> so carving operation is performed
         nh->set_label(Cell_label::OUTSIDE);
 #ifndef CGAL_AW3_USE_SORTED_PRIORITY_QUEUE
         nh->increment_erase_counter();
 #endif
 
         // for each finite facet of neighbor, push it to the queue
+        // carved into nh via gate face, so nh now outside, other 3 faces might now be boundary facets, so push to queue
         const int mi = m_tr.mirror_index(ch, s);
         for(int i=1; i<4; ++i)
         {
@@ -1394,6 +1493,7 @@ private:
       }
     } // while(!queue.empty())
 
+    // if queue is emtpy carving operations end
     visitor.on_flood_fill_end(*this);
 
     // Check that no useful facet has been ignored

@@ -3,6 +3,11 @@ project(Thesis)
 
 set(CMAKE_CXX_STANDARD 20)
 
+# Use local modified CGAL headers first, can exclude this, than normal alpha wrap algorithm is used
+include_directories(
+        ${CMAKE_SOURCE_DIR}/cgal_override
+)
+
 find_package(CGAL REQUIRED)
 
 add_executable(alpha_wrap_example 3D_alpha_wrap.cpp)
