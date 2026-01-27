@@ -1,17 +1,12 @@
 // ========================== INCLUDE STUFF ===============================
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
-#include <map>
 #include <CGAL/alpha_wrap_3.h>
 #include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
 #include <CGAL/Real_timer.h>
-#include <CGAL/Polygon_mesh_processing/compute_normal.h>
 #include <CGAL/AABB_tree.h>
 #include <CGAL/AABB_face_graph_triangle_primitive.h>
 #include <CGAL/AABB_traits.h>
-#include <CGAL/Object.h>
-#include <CGAL/boost/graph/helpers.h>
-#include <boost/variant/get.hpp>
 #include <iostream>
 #include <string>
 #include <filesystem>
@@ -27,8 +22,8 @@ using Point_3 = K::Point_3;
 using Vector_3 = K::Vector_3;
 using Mesh = CGAL::Surface_mesh<Point_3>;
 using face_descriptor = Mesh::Face_index;
-using Ray_3   = K::Ray_3;
-using Segment_3 = K::Segment_3;
+using Ray_3       = K::Ray_3;
+using Segment_3   = K::Segment_3;
 using Primitive   = CGAL::AABB_face_graph_triangle_primitive<Mesh>;
 using AABB_traits = CGAL::AABB_traits<K, Primitive>;
 using Tree        = CGAL::AABB_tree<AABB_traits>;
@@ -64,37 +59,24 @@ int main(int argc, char** argv)
   const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Input/3DBAG_Buildings/joep_huis.off");
     std::cout << "------------------------------------------------------------" << std::endl;
   std::cout << "Reading input: " << filename << std::endl;
-    // demo 1
+
   const double relative_alpha = 70.; //2000. //20. //1000.
   const double relative_offset = 1500.; // 7000. //600. //12000.
 
-
-    // create output name (+ folder if folder does not exist)
-    std::string output_name = generate_output_name(filename, relative_alpha, relative_offset);
-
-    std::filesystem::path p(output_name);
-    std::filesystem::create_directory(p.parent_path());
-
-    // ---------------------------Mesh the input (optional: compute normals and tree)----------------------------------
+    // ----------------------MESH INPUT FILE (optional: compute normals and tree)------------------
     auto data = mesh_input(filename, true, true); // set both to false if you do not want to compute normals + tree
     Mesh& mesh = data.mesh;
     Tree& tree = *data.tree;
 
-    // ----------------------------IS MESH VALID?------------------------------------
+    // ----------------------------IS INPUT MESH VALID?------------------------------------
     valid_mesh_boolean(mesh);
-    std::cout << "------------------------------------------------------------" << std::endl;
 
-    // demo 2
-    // ------------------ ALPHA WRAP FROM THE OUTSIDE-----------------------------
-    std::cout << "-----------------3D ALPHA WRAPPING THE INPUT:-------------" << std::endl;
-    Mesh alpha_wrap = _3D_alpha_wrap( output_name,relative_alpha,relative_offset, mesh);
+    // ------------------------------ALPHA WRAP INPUT---------------------------------------
+    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, mesh, false, true); // set both to false if you do not want to write out the file and test if valid
+    // -------------------------- alpha wrap from inside -----------------------------------
+    Mesh alpha_inside_wrap = _3D_alpha_inside_wrap( filename,relative_alpha,relative_offset, mesh, false, false);
 
-    // is mesh valid?
-    std::cout << "Testing if 3D alpha wrapped mesh is valid:" << std::endl;
-    valid_mesh_boolean(alpha_wrap);
-    std::cout << "------------------------------------------------------------" << std::endl;
 
-    // demo 3
         // ----------------- SHARPENING EDGES --------------------
     std::string weight_output_wrap =
         "../data/Output/demo/refined.ply";
@@ -212,18 +194,6 @@ int main(int argc, char** argv)
     //
     // std::cout << "Octree wireframe written to:\n"
     //           << octree_refinement << std::endl;
-
-
-
-  // // ------------------ ALPHA WRAP FROM THE INSIDE -----------------------
-  //   std::cout << "--------3D ALPHA WRAPPING THE INPUT FROM INSIDE:----------" << std::endl;
-  // Mesh alpha_inside_wrap = _3D_alpha_inside_wrap( output_name,relative_alpha,relative_offset, mesh);
-
-    // // is mesh valid?
-    // std::cout << "Testing if from inside 3D alpha wrapped mesh is valid:" << std::endl;
-    // valid_mesh_boolean(alpha_inside_wrap);
-  // std::cout << "------------------------------------------------------------" << std::endl;
-
 
     //
     // // tag + colorise inner wrap

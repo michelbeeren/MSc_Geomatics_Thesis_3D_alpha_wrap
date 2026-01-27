@@ -10,11 +10,9 @@ struct MeshData {
     std::unique_ptr<Tree> tree;  // optional
 };
 
-std::string generate_output_name(const std::string input_name_, const double rel_alpha_, const double rel_offset_);
-Mesh _3D_alpha_wrap(const std::string output_, const double relative_alpha_, const double relative_offset_, Mesh& mesh_);
+Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, Mesh& mesh_, bool write_out_, bool validate);
 double rel_offset_to_offset(Mesh& mesh, const double relative_offset);
-Point_3 random_point_inside_mesh(const Mesh& mesh);
-Mesh _3D_alpha_inside_wrap(const std::string output_, const double relative_alpha_, const double relative_offset_, Mesh& mesh_);
+Mesh _3D_alpha_inside_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, Mesh& mesh_, bool write_out_, bool validate);
 MeshData mesh_input(const std::string& filename, bool compute_normals = true, bool build_tree = true);
 
 #endif //THESIS_ALPHA_WRAP_H

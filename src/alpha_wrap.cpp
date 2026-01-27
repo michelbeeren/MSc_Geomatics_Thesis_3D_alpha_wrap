@@ -33,10 +33,12 @@ using AABB_traits = CGAL::AABB_traits<K, Primitive>;
 using Tree        = CGAL::AABB_tree<AABB_traits>;
 
 #include "alpha_wrap.h"
+#include "val3dity.h"
 
 // --------------------------------------MESH INPUT-------------------------------------
 MeshData mesh_input(const std::string& filename, bool compute_normals, bool build_tree)
 {
+    // meshes input file, optionally also computes normals and builds a tree
     MeshData out;
 
     if (!CGAL::Polygon_mesh_processing::IO::read_polygon_mesh(filename, out.mesh) ||
@@ -101,9 +103,8 @@ std::string generate_output_name(const std::string input_name_, const double rel
 }
 
 // 3D alpha wrap
-Mesh _3D_alpha_wrap(const std::string output_, const double relative_alpha_, const double relative_offset_, Mesh& mesh_) {
-    // std::cout << "omg omg it is a triangle mesh!;" << std::endl;
-    // std::cout << "relative_alpha: " << relative_alpha_ << " and relative offset: " << relative_offset_ << std::endl;
+Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, Mesh& mesh_, bool write_out_, bool validate) {
+    // compute alpha and offset from a_rel and d_rel and bbox
     CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh_);
     const double diag_length = std::sqrt(CGAL::square(bbox.xmax() - bbox.xmin()) +
                                          CGAL::square(bbox.ymax() - bbox.ymin()) +
@@ -111,7 +112,8 @@ Mesh _3D_alpha_wrap(const std::string output_, const double relative_alpha_, con
     // std::cout << "diagonal bbox length: " << diag_length << std::endl;
     const double alpha = diag_length / relative_alpha_;
     const double offset = diag_length / relative_offset_;
-    std::cout << "Alpha wrapping with a_rel = " << relative_alpha_ << " and offset_rel = " << relative_offset_ << ", which results in alpha = " << alpha << " and offset = " << offset << std::endl;
+    std::cout << "--------------------3D ALPHA WRAPPING THE INPUT:----------------" << std::endl;
+    std::cout << "alpha = " << alpha << " (a_rel = " << relative_alpha_ << ") and offset = " << offset << " (offset_rel = " << relative_offset_ << ")" << std::endl;
     // Construct the wrap
     CGAL::Real_timer t;
     t.start();
@@ -120,13 +122,23 @@ Mesh _3D_alpha_wrap(const std::string output_, const double relative_alpha_, con
     CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap);
 
     t.stop();
-    std::cout << "Result: " << num_vertices(wrap) << " vertices, " << num_faces(wrap) << " faces, it took " << t.time() << " s." << std::endl;
+    std::cout << "🎁 succesfully alpha wrapped! 🎁: " << num_vertices(wrap) << " 🔘vertices🔘, " << num_faces(wrap) << " 📐faces📐, it took " << t.time() << " s.⏰" << std::endl;
     // std::cout << "Took " << t.time() << " s." << std::endl;
 
     // ------------------------------ write output mesh -------------------------------
-    const std::string output_name = output_;
-    std::cout << "Writing to " << output_name << std::endl;
-    CGAL::IO::write_polygon_mesh(output_name, wrap, CGAL::parameters::stream_precision(17));
+    if (write_out_) {
+        // generate output name from input name
+        std::string output_ = generate_output_name(filename, relative_alpha_, relative_offset_);
+        std::filesystem::path p(output_);
+        std::filesystem::create_directory(p.parent_path());
+    std::cout << "📝Writing📝 to: " << output_ << std::endl;
+    CGAL::IO::write_polygon_mesh(output_, wrap, CGAL::parameters::stream_precision(17));}
+
+    // ----------------------------- validate the output ------------------------------
+    if (validate) {
+        valid_mesh_boolean(wrap);
+    }
+    std::cout << "---------------------------------------------------------------" << std::endl;
 
     return wrap;
 
@@ -166,29 +178,21 @@ Point_3 random_point_inside_mesh(const Mesh& mesh)
     }
 }
 
-// 3D alpha wrap from inside TODO point inside generation can be better
-Mesh _3D_alpha_inside_wrap(const std::string output_, const double relative_alpha_, const double relative_offset_, Mesh& mesh_) {
-  // std::cout << "omg omg it is a triangle mesh!;" << std::endl;
-  // std::cout << "relative_alpha: " << relative_alpha_ << " and relative offset: " << relative_offset_ << std::endl;
+Mesh _3D_alpha_inside_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, Mesh& mesh_, bool write_out_, bool validate) {
   CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh_);
   const double diag_length = std::sqrt(CGAL::square(bbox.xmax() - bbox.xmin()) +
                                        CGAL::square(bbox.ymax() - bbox.ymin()) +
                                        CGAL::square(bbox.zmax() - bbox.zmin()));
-  // std::cout << "diagonal bbox length: " << diag_length << std::endl;
   const double alpha = diag_length / relative_alpha_;
   const double offset = diag_length / relative_offset_;
-    std::cout << "Alpha wrapping from inside with a_rel = " << relative_alpha_ << " and offset_rel = " << relative_offset_ << ", which results in alpha = " << alpha << " and offset = " << offset << std::endl;
+
+    std::cout << "-------------3D ALPHA WRAPPING THE INPUT FROM INSIDE:----------" << std::endl;
+    std::cout << "alpha = " << alpha << " (a_rel = " << relative_alpha_ << ") and offset = " << offset << " (offset_rel = " << relative_offset_ << ")" << std::endl;
 
   // Construct the wrap
   CGAL::Real_timer t;
   t.start();
 
-    // // point now placed in middle of bounding box
-    // std::vector<Point_3> seeds = {
-    //     Point_3((bbox.xmin() + bbox.xmax()) / 2,(bbox.ymin() + bbox.ymax()) / 2,(bbox.zmin() + bbox.zmax()) / 2)
-    // };
-
-    // with random point generated inside input mesh -> not reliable method still
     std::vector<Point_3> seeds = {
         random_point_inside_mesh(mesh_)
     };
@@ -197,27 +201,32 @@ Mesh _3D_alpha_inside_wrap(const std::string output_, const double relative_alph
   CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::seed_points(std::ref(seeds)));
 
   t.stop();
-  std::cout << "Result: " << num_vertices(wrap) << " vertices, " << num_faces(wrap) << " faces, it took " << t.time() << " s." << std::endl;
-  // std::cout << "Took " << t.time() << " s." << std::endl;
+    std::cout << "🎁 succesfully alpha wrapped! 🎁: " << num_vertices(wrap) << " 🔘vertices🔘, " << num_faces(wrap) << " 📐faces📐, it took " << t.time() << " s.⏰" << std::endl;
 
-    // ------------------------------ write out output file -------------------------------
-    std::string out_path = output_;
-    // Remove last 4 characters (".off")
-    if (out_path.size() > 4 && out_path.substr(out_path.size() - 4) == ".off") {
-        out_path = out_path.substr(0, out_path.size() - 4);
+    if (write_out_) {
+        // ---------------------------- generate output name -------------------------------
+        std::string output_ = generate_output_name(filename, relative_alpha_, relative_offset_);
+        std::filesystem::path p(output_);
+        std::filesystem::create_directory(p.parent_path());
+
+        // Remove last 4 characters (".off")
+        if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
+            output_ = output_.substr(0, output_.size() - 4);
+        }
+
+        // Add current alpha and offset to the output name
+        std::string out_name = output_ + "_inside_wrap.off";
+
+        // ------------------------------ write out output file -------------------------------
+        std::cout << "📝Writing📝 to: " << output_ << std::endl;
+        CGAL::IO::write_polygon_mesh(out_name, wrap, CGAL::parameters::stream_precision(17));
     }
 
-    // Add cuurent alpha and offset to the output name
-    std::string out_name = out_path + "_inside_wrap.off";
+    // ------------------------------ validate wrapped mesh ------------------------------------
+    if (validate) {
+        valid_mesh_boolean(wrap);
+    }
 
-    std::cout << "Writing to " << out_name << std::endl;
-    CGAL::IO::write_polygon_mesh(out_name, wrap, CGAL::parameters::stream_precision(17));
-
-    // std::string offset_output = "../data/Test_3D_Alphawrap/Output/3DBAG_Buildings/offset_testtest.off";
-    // Mesh offset_mesh = offset_mesh_by_5cm(wrap, offset);
-
-    // std::cout << "Writing to " << offset_output << std::endl;
-    // CGAL::IO::write_polygon_mesh(offset_output, offset_mesh, CGAL::parameters::stream_precision(17));
-
+    std::cout << "---------------------------------------------------------------" << std::endl;
     return wrap;
 }
