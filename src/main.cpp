@@ -49,6 +49,7 @@ struct LeafCell {
 #include "alpha_wrap.h"
 #include "edge_refinement.h"
 #include "octree.h"
+#include "MAT.h"
 
 // ==================================================================================
 // ==================================== MAIN ========================================
@@ -71,10 +72,14 @@ int main(int argc, char** argv)
     // ----------------------------IS INPUT MESH VALID?------------------------------------
     valid_mesh_boolean(mesh);
 
+    // -------------------------------------MAT--------------------------------------------
+    auto pts = _surface_sampling(mesh,relative_alpha);
+    write_points_as_off("../data/Output/MAT/sampled_points.off",pts);
+
     // ------------------------------ALPHA WRAP INPUT---------------------------------------
-    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, mesh, false, true); // set both to false if you do not want to write out the file and test if valid
+    // Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, mesh, false, true); // set both to false if you do not want to write out the file and test if valid
     // -------------------------- alpha wrap from inside -----------------------------------
-    Mesh alpha_inside_wrap = _3D_alpha_inside_wrap( filename,relative_alpha,relative_offset, mesh, false, false);
+    // Mesh alpha_inside_wrap = _3D_alpha_inside_wrap( filename,relative_alpha,relative_offset, mesh, false, false);
 
 
     //     // ----------------- SHARPENING EDGES --------------------

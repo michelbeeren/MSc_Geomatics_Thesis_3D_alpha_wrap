@@ -19,6 +19,8 @@ add_executable(alpha_wrap src/main.cpp
         src/edge_refinement.h
         src/octree.cpp
         src/octree.h
+        src/MAT.cpp
+        src/MAT.h
 )
 
 
