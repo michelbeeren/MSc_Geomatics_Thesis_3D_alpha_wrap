@@ -77,63 +77,63 @@ int main(int argc, char** argv)
     Mesh alpha_inside_wrap = _3D_alpha_inside_wrap( filename,relative_alpha,relative_offset, mesh, false, false);
 
 
-        // ----------------- SHARPENING EDGES --------------------
-    std::string weight_output_wrap =
-        "../data/Output/demo/refined.ply";
-    // std::string weight_output_inner_wrap =
-    //     "../data/Test_3D_Alphawrap/Output/3DBAG_Buildings/d_innerwrap_input_bk.ply";
-
-    // // offset wrapped from inside mesh
-    double _2_offset = rel_offset_to_offset(mesh, relative_offset);
-    double offset = (rel_offset_to_offset(mesh, relative_offset))/2;
-    // Mesh offset_inner_wrap = offset_mesh(alpha_inside_wrap, _2_offset);
-    // std::cout << "Succesfully offsetted wrapped from inside mesh" << std::endl;
-
-    Mesh offset_input = offset_mesh(mesh, offset);
-
-    // tag + colorise outer wrap
-    CGAL::Real_timer t;
-    t.start();
-    Mesh distance_alpha = add_midpoint_distance_tag(alpha_wrap, offset_input, 220);
-    // std::cout << "Succesfully adding midpoint distance to alpha wrap mesh" << std::endl;
-
-    // std::cout << "Writing to " << weight_output_wrap << std::endl;
-    {
-      std::ofstream out(weight_output_wrap, std::ios::binary);
-      if (!out) {
-          std::cerr << "Cannot open " << weight_output_wrap << " for writing\n";
-      } else {
-          CGAL::IO::write_PLY(
-              out,
-              distance_alpha,
-              CGAL::parameters::stream_precision(17)
-          );
-      }
-    }
-    std::string refining =
-    "../data/Output/demo/sharpe_concave_corners.ply";
-    Mesh refined_edges = refine_round_edges(distance_alpha, offset_input);
-    t.stop();
-    std::cout << "Took " << t.time() << " s." << std::endl;
-    std::cout << "Succesfully refined edges" << std::endl;
-
-    std::cout << "Writing to " << refining << std::endl;
-    {
-      std::ofstream out(refining, std::ios::binary);
-      if (!out) {
-          std::cerr << "Cannot open " << refining << " for writing\n";
-      } else {
-          CGAL::IO::write_PLY(
-              out,
-              refined_edges,
-              CGAL::parameters::stream_precision(17)
-          );
-      }
-    }
-    // ----------------------------IS MESH VALID?------------------------------------
-    // std::cout << "Testing if input mesh is valid:" << std::endl;
-    valid_mesh_boolean(refined_edges);
-    std::cout << "------------------------------------------------------------" << std::endl;
+    //     // ----------------- SHARPENING EDGES --------------------
+    // std::string weight_output_wrap =
+    //     "../data/Output/demo/refined.ply";
+    // // std::string weight_output_inner_wrap =
+    // //     "../data/Test_3D_Alphawrap/Output/3DBAG_Buildings/d_innerwrap_input_bk.ply";
+    //
+    // // // offset wrapped from inside mesh
+    // double _2_offset = rel_offset_to_offset(mesh, relative_offset);
+    // double offset = (rel_offset_to_offset(mesh, relative_offset))/2;
+    // // Mesh offset_inner_wrap = offset_mesh(alpha_inside_wrap, _2_offset);
+    // // std::cout << "Succesfully offsetted wrapped from inside mesh" << std::endl;
+    //
+    // Mesh offset_input = offset_mesh(mesh, offset);
+    //
+    // // tag + colorise outer wrap
+    // CGAL::Real_timer t;
+    // t.start();
+    // Mesh distance_alpha = add_midpoint_distance_tag(alpha_wrap, offset_input, 220);
+    // // std::cout << "Succesfully adding midpoint distance to alpha wrap mesh" << std::endl;
+    //
+    // // std::cout << "Writing to " << weight_output_wrap << std::endl;
+    // {
+    //   std::ofstream out(weight_output_wrap, std::ios::binary);
+    //   if (!out) {
+    //       std::cerr << "Cannot open " << weight_output_wrap << " for writing\n";
+    //   } else {
+    //       CGAL::IO::write_PLY(
+    //           out,
+    //           distance_alpha,
+    //           CGAL::parameters::stream_precision(17)
+    //       );
+    //   }
+    // }
+    // std::string refining =
+    // "../data/Output/demo/sharpe_concave_corners.ply";
+    // Mesh refined_edges = refine_round_edges(distance_alpha, offset_input);
+    // t.stop();
+    // std::cout << "Took " << t.time() << " s." << std::endl;
+    // std::cout << "Succesfully refined edges" << std::endl;
+    //
+    // std::cout << "Writing to " << refining << std::endl;
+    // {
+    //   std::ofstream out(refining, std::ios::binary);
+    //   if (!out) {
+    //       std::cerr << "Cannot open " << refining << " for writing\n";
+    //   } else {
+    //       CGAL::IO::write_PLY(
+    //           out,
+    //           refined_edges,
+    //           CGAL::parameters::stream_precision(17)
+    //       );
+    //   }
+    // }
+    // // ----------------------------IS MESH VALID?------------------------------------
+    // // std::cout << "Testing if input mesh is valid:" << std::endl;
+    // valid_mesh_boolean(refined_edges);
+    // std::cout << "------------------------------------------------------------" << std::endl;
 
     // // -------------------------------OCTREE REFINEMENT---------------------------
     // // Create root octree cell
