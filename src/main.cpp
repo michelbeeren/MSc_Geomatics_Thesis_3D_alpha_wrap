@@ -67,6 +67,8 @@ int main(int argc, char** argv)
     // ----------------------MESH INPUT FILE (optional: compute normals and tree)------------------
     auto data = mesh_input(filename, true, true); // set both to false if you do not want to compute normals + tree
     Mesh& mesh = data.mesh;
+    auto face_normals = data.face_normals;
+    std::cout << "does this work? face_normals.size = " << face_normals.size() << std::endl;
     Tree& tree = *data.tree;
 
     // ----------------------------IS INPUT MESH VALID?------------------------------------
@@ -75,6 +77,19 @@ int main(int argc, char** argv)
     // -------------------------------------MAT--------------------------------------------
     auto pts = _surface_sampling(mesh,relative_alpha);
     write_points_as_off("../data/Output/MAT/sampled_points.off",pts);
+
+    std::filesystem::create_directories("../data/Output/MAT/sampled_points");
+    std::filesystem::create_directories("../data/Output/MAT/result");
+    write_coords_npy("../data/Output/MAT/sampled_points/coords.npy", pts);
+    auto normals = normals_for_points_from_closest_face(mesh, tree, face_normals, pts);
+    write_normals_npy("../data/Output/MAT/sampled_points/normals.npy", normals);
+    std::cout << "coords exists: " << std::filesystem::exists("../data/Output/MAT/sampled_points/coords.npy") << "\n";
+    std::cout << "normals exists: " << std::filesystem::exists("../data/Output/MAT/sampled_points/normals.npy") << "\n";
+    std::cout << "coords bytes: " << std::filesystem::file_size("../data/Output/MAT/sampled_points/coords.npy") << "\n";
+    std::cout << "normals bytes: " << std::filesystem::file_size("../data/Output/MAT/sampled_points/normals.npy") << "\n";
+    run_masbcpp_compute_ma("../data/Output/MAT/sampled_points","../data/Output/MAT/result");
+    write_points_as_off("../data/Output/MAT/sampled_points/pts.off", pts);
+    write_mat_colored_coff("../data/Output/MAT/result/ma_coords_out.npy","../data/Output/MAT/result/ma_qidx_out.npy","../data/Output/MAT/sampled_points/coords.npy",  "../data/Output/MAT/result/ma_colored.off");
 
     // ------------------------------ALPHA WRAP INPUT---------------------------------------
     // Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, mesh, false, true); // set both to false if you do not want to write out the file and test if valid

@@ -1,0 +1,3 @@
+[submodule "external/masbcpp"]
+	path = external/masbcpp
+	url = https://github.com/tudelft3d/masbcpp
