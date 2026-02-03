@@ -90,6 +90,20 @@ int main(int argc, char** argv)
     run_masbcpp_compute_ma("../data/Output/MAT/sampled_points","../data/Output/MAT/result");
     write_points_as_off("../data/Output/MAT/sampled_points/pts.off", pts);
     write_mat_colored_coff("../data/Output/MAT/result/ma_coords_out.npy","../data/Output/MAT/result/ma_qidx_out.npy","../data/Output/MAT/sampled_points/coords.npy",  "../data/Output/MAT/result/ma_colored.off");
+    write_surface_colored_by_ball_proxy("../data/Output/MAT/result/ma_coords_out.npy","../data/Output/MAT/result/ma_qidx_out.npy","../data/Output/MAT/sampled_points/coords.npy","../data/Output/MAT/result/surface_colored.off");
+    double diag = bbox_diag(mesh);
+    double scale = diag * 0.01; // start with 1% of bbox diagonal; try 0.005 .. 0.02
+
+    write_normals_as_obj_lines("../data/Output/MAT/sampled_points/normals.obj",
+                               pts, normals, scale);
+    write_surface_colored_by_power_distance(
+  "../data/Output/MAT/result/ma_coords_out.npy",
+  "../data/Output/MAT/result/ma_qidx_out.npy",
+  "../data/Output/MAT/sampled_points/coords.npy",
+  "../data/Output/MAT/result/surface_colored_power.off"
+);
+    generate_lfs_ply("../data/Output/MAT/sampled_points","../data/Output/MAT/result","../data/Output/MAT/result/test.ply");
+
 
     // ------------------------------ALPHA WRAP INPUT---------------------------------------
     // Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, mesh, false, true); // set both to false if you do not want to write out the file and test if valid

@@ -15,4 +15,18 @@ void run_masbcpp_compute_ma(const std::string& in_dir, const std::string& out_di
 void write_npy_points_as_off(const std::string& npy_file, const std::string& off_file);
 // void write_mat_colored_coff(const std::string& coords_npy, const std::string& radii_npy, const std::string& coff_file);
 void write_mat_colored_coff(const std::string& ma_coords_out_npy,const std::string& ma_qidx_out_npy,const std::string& coords_indexed_by_qidx_npy,const std::string& coff_file);
+void write_surface_colored_by_ball_proxy(const std::string& ma_coords_out_npy, const std::string& ma_qidx_out_npy, const std::string& coords_indexed_by_qidx_npy, const std::string& coff_file);
+void write_normals_as_obj_lines(const std::string& obj_file,
+                                const std::vector<Point_3>& pts,
+                                const std::vector<Vector_3>& normals,
+                                double scale);
+double bbox_diag(const Mesh& mesh);
+void write_surface_colored_by_power_distance(const std::string& ma_coords_out_npy,
+                                             const std::string& ma_qidx_out_npy,
+                                             const std::string& surface_coords_npy,
+                                             const std::string& coff_file);
+void generate_lfs_ply(const std::string& in_dir,
+                      const std::string& out_dir,
+                      const std::string& output_path);
+
 #endif //THESIS_MAT_H
