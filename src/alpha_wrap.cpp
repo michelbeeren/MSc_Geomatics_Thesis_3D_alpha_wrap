@@ -132,7 +132,7 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         std::filesystem::path p(output_);
         std::filesystem::create_directory(p.parent_path());
     std::cout << "📝Writing📝 to: " << output_ << std::endl;
-    CGAL::IO::write_polygon_mesh(output_, wrap, CGAL::parameters::stream_precision(17));}
+    CGAL::IO::write_polygon_mesh(output_, wrap, CGAL::parameters::stream_precision(25));}
 
     // ----------------------------- validate the output ------------------------------
     if (validate) {

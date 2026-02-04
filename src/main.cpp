@@ -57,12 +57,12 @@ struct LeafCell {
 int main(int argc, char** argv)
 {
   // Read the input
-  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Input/3DBAG_Buildings/joep_huis.off");
+  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Input/3DBAG_Buildings/bouwkunde.off");
     std::cout << "------------------------------------------------------------" << std::endl;
   std::cout << "Reading input: " << filename << std::endl;
 
-  const double relative_alpha = 70.; //2000. //20. //1000.
-  const double relative_offset = 1500.; // 7000. //600. //12000.
+  const double relative_alpha = 750; //2000. //20. //1000.
+  const double relative_offset = 12000.; // 7000. //600. //12000.
 
     // ----------------------MESH INPUT FILE (optional: compute normals and tree)------------------
     auto data = mesh_input(filename, true, true); // set both to false if you do not want to compute normals + tree
@@ -74,39 +74,22 @@ int main(int argc, char** argv)
     // ----------------------------IS INPUT MESH VALID?------------------------------------
     valid_mesh_boolean(mesh);
 
-    // -------------------------------------MAT--------------------------------------------
-    auto pts = _surface_sampling(mesh,relative_alpha);
-    write_points_as_off("../data/Output/MAT/sampled_points.off",pts);
-
-    std::filesystem::create_directories("../data/Output/MAT/sampled_points");
-    std::filesystem::create_directories("../data/Output/MAT/result");
-    write_coords_npy("../data/Output/MAT/sampled_points/coords.npy", pts);
-    auto normals = normals_for_points_from_closest_face(mesh, tree, face_normals, pts);
-    write_normals_npy("../data/Output/MAT/sampled_points/normals.npy", normals);
-    std::cout << "coords exists: " << std::filesystem::exists("../data/Output/MAT/sampled_points/coords.npy") << "\n";
-    std::cout << "normals exists: " << std::filesystem::exists("../data/Output/MAT/sampled_points/normals.npy") << "\n";
-    std::cout << "coords bytes: " << std::filesystem::file_size("../data/Output/MAT/sampled_points/coords.npy") << "\n";
-    std::cout << "normals bytes: " << std::filesystem::file_size("../data/Output/MAT/sampled_points/normals.npy") << "\n";
-    run_masbcpp_compute_ma("../data/Output/MAT/sampled_points","../data/Output/MAT/result");
-    write_points_as_off("../data/Output/MAT/sampled_points/pts.off", pts);
-    write_mat_colored_coff("../data/Output/MAT/result/ma_coords_out.npy","../data/Output/MAT/result/ma_qidx_out.npy","../data/Output/MAT/sampled_points/coords.npy",  "../data/Output/MAT/result/ma_colored.off");
-    write_surface_colored_by_ball_proxy("../data/Output/MAT/result/ma_coords_out.npy","../data/Output/MAT/result/ma_qidx_out.npy","../data/Output/MAT/sampled_points/coords.npy","../data/Output/MAT/result/surface_colored.off");
-    double diag = bbox_diag(mesh);
-    double scale = diag * 0.01; // start with 1% of bbox diagonal; try 0.005 .. 0.02
-
-    write_normals_as_obj_lines("../data/Output/MAT/sampled_points/normals.obj",
-                               pts, normals, scale);
-    write_surface_colored_by_power_distance(
-  "../data/Output/MAT/result/ma_coords_out.npy",
-  "../data/Output/MAT/result/ma_qidx_out.npy",
-  "../data/Output/MAT/sampled_points/coords.npy",
-  "../data/Output/MAT/result/surface_colored_power.off"
-);
-    generate_lfs_ply("../data/Output/MAT/sampled_points","../data/Output/MAT/result","../data/Output/MAT/result/test.ply");
+    // // -------------------------------------MAT--------------------------------------------
+    // auto pts = _surface_sampling(mesh,relative_alpha);
+    // write_points_as_off("../data/Output/MAT/sampled_points.off",pts);
+    //
+    // std::filesystem::create_directories("../data/Output/MAT/sampled_points");
+    // std::filesystem::create_directories("../data/Output/MAT/result");
+    // write_coords_npy("../data/Output/MAT/sampled_points/coords.npy", pts);
+    // auto normals = normals_for_points_from_closest_face(mesh, tree, face_normals, pts);
+    // write_normals_npy("../data/Output/MAT/sampled_points/normals.npy", normals);
+    // run_masbcpp_compute_ma("../data/Output/MAT/sampled_points","../data/Output/MAT/result");
+    // generate_lfs_ply("../data/Output/MAT/sampled_points","../data/Output/MAT/result","../data/Output/MAT/result/test.ply");
+    // generate_lfs_ply_concave("../data/Output/MAT/sampled_points","../data/Output/MAT/result","../data/Output/MAT/result/test_concave.ply");
 
 
     // ------------------------------ALPHA WRAP INPUT---------------------------------------
-    // Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, mesh, false, true); // set both to false if you do not want to write out the file and test if valid
+    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, mesh, true, false); // set both to false if you do not want to write out the file and test if valid
     // -------------------------- alpha wrap from inside -----------------------------------
     // Mesh alpha_inside_wrap = _3D_alpha_inside_wrap( filename,relative_alpha,relative_offset, mesh, false, false);
 

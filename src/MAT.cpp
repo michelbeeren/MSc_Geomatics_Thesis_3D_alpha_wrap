@@ -997,5 +997,80 @@ void generate_lfs_ply(const std::string& in_dir,
     out.close();
 }
 
+void generate_lfs_ply_concave(const std::string& in_dir,
+                      const std::string& out_dir,
+                      const std::string& output_path)
+{
+    // 1) Load NPY files
+    cnpy::NpyArray arr_coords = cnpy::npy_load(in_dir  + "/coords.npy");
+    cnpy::NpyArray arr_ma_out = cnpy::npy_load(out_dir + "/ma_coords_out.npy");
+    cnpy::NpyArray arr_qo     = cnpy::npy_load(out_dir + "/ma_qidx_out.npy");
+
+    // 2) Validate shapes
+    require_shape_N3(arr_coords, "coords");
+    require_shape_N3(arr_ma_out, "ma_coords_out");
+
+    const size_t N = arr_coords.shape[0];
+    require_shape_N(arr_qo, N, "ma_qidx_out");
+
+    const size_t Nout_ma = arr_ma_out.shape[0];
+
+    // 3) Expect float32 for coords + MA
+    if (arr_coords.word_size != sizeof(float))
+        throw std::runtime_error("coords.npy is not float32 (word_size=" + std::to_string(arr_coords.word_size) + ")");
+    if (arr_ma_out.word_size != sizeof(float))
+        throw std::runtime_error("ma_coords_out.npy is not float32");
+
+    // 4) Access float pointers
+    const float* coords = reinterpret_cast<const float*>(arr_coords.data);
+    const float* ma_out = reinterpret_cast<const float*>(arr_ma_out.data);
+
+    // 5) Load qidx as int64 (supports int32 or int64 input)
+    std::vector<int64_t> qidx_out = load_qidx_as_i64(arr_qo, "ma_qidx_out");
+
+    // 6) Write PLY header
+    std::ofstream out(output_path);
+    if (!out.is_open())
+        throw std::runtime_error("Could not open output PLY file: " + output_path);
+
+    out << "ply\n";
+    out << "format ascii 1.0\n";
+    out << "element vertex " << N << "\n";
+    out << "property float x\n";
+    out << "property float y\n";
+    out << "property float z\n";
+    out << "property float feature_size\n";
+    out << "end_header\n";
+    out << std::fixed << std::setprecision(7);
+
+    // 7) Compute LFS using only the outer medial axis (ignore the inner)
+    for (size_t i = 0; i < N; ++i)
+    {
+        const float px = coords[i*3 + 0];
+        const float py = coords[i*3 + 1];
+        const float pz = coords[i*3 + 2];
+
+        float dist_out = std::numeric_limits<float>::infinity();
+
+        const int64_t io = qidx_out[i];
+        if (io >= 0 && static_cast<size_t>(io) < Nout_ma)
+        {
+            const float dx = px - ma_out[io*3 + 0];
+            const float dy = py - ma_out[io*3 + 1];
+            const float dz = pz - ma_out[io*3 + 2];
+            dist_out = std::sqrt(dx*dx + dy*dy + dz*dz);
+        }
+
+        // Since we're using only the outer MA, dist_in is not considered (set to inf)
+        float lfs = dist_out;
+        if (!std::isfinite(lfs)) lfs = -1.0f;
+
+        out << px << " " << py << " " << pz << " " << lfs << "\n";
+    }
+
+    out.close();
+}
+
+
 
 

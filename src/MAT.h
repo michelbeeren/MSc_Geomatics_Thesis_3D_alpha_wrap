@@ -28,5 +28,8 @@ void write_surface_colored_by_power_distance(const std::string& ma_coords_out_np
 void generate_lfs_ply(const std::string& in_dir,
                       const std::string& out_dir,
                       const std::string& output_path);
+void generate_lfs_ply_concave(const std::string& in_dir,
+                      const std::string& out_dir,
+                      const std::string& output_path);
 
 #endif //THESIS_MAT_H
