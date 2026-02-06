@@ -184,13 +184,13 @@ protected:
   // test test
   // really stupid, but this is the ply file, in where you can look what the approximated feature size is of the nn point
 
-  // // this one for joep_huis
-  // mutable CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits> m_fs_mat
-  //   = CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>("../data/Output/MAT/result/test.ply");
-
-  // this one for bk
+  // this one for joep_huis
   mutable CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits> m_fs_mat
-  = CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>("../data/Output/MAT/result/test_bk.ply");
+    = CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>("../data/Output/MAT/result/test.ply");
+
+  // // this one for bk
+  // mutable CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits> m_fs_mat
+  // = CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>("../data/Output/MAT/result/test_bk.ply");
 
   FT m_alpha = FT(-1), m_sq_alpha = FT(-1);
   FT m_offset = FT(-1), m_sq_offset = FT(-1);
