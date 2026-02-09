@@ -47,9 +47,9 @@ std::vector<Point_3> _surface_sampling(const Mesh& mesh, const double relative_a
     const double diag_length = std::sqrt(CGAL::square(bbox.xmax() - bbox.xmin()) +
                                          CGAL::square(bbox.ymax() - bbox.ymin()) +
                                          CGAL::square(bbox.zmax() - bbox.zmin()));
-    // std::cout << "diagonal bbox length: " << diag_length << std::endl;
+    std::cout << "diagonal bbox length: " << diag_length << std::endl;
     const double alpha = diag_length / relative_alpha_;
-    const double density = 10.0 / (std::sqrt(3.0) * alpha * alpha);
+    const double density = 300. * std::pow((1-alpha),10);
 
     // ✅ ADD THIS BLOCK RIGHT HERE
     std::cout
@@ -73,7 +73,7 @@ std::vector<Point_3> _surface_sampling(const Mesh& mesh, const double relative_a
         CGAL::parameters::use_random_uniform_sampling(true)
                         .number_of_points_per_area_unit(density)
                         .do_sample_vertices(false)
-                        .do_sample_edges(false)
+                        .do_sample_edges(true)
                         .do_sample_faces(true)
     );
 

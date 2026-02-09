@@ -57,12 +57,12 @@ struct LeafCell {
 int main(int argc, char** argv)
 {
   // Read the input
-  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Input/3DBAG_Buildings/joep_huis.off");
+  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Input/3DBAG_Buildings/bouwkunde.off");
     std::cout << "------------------------------------------------------------" << std::endl;
   std::cout << "Reading input: " << filename << std::endl;
 
-  const double relative_alpha = 100; //2000. //20. //1000.
-  const double relative_offset = 2000.; // 7000. //600. //12000.
+  const double relative_alpha = 1000; //2000. //20. //1000.
+  const double relative_offset = 12000.; // 7000. //600. //12000.
 
     // ----------------------MESH INPUT FILE (optional: compute normals and tree)------------------
     auto data = mesh_input(filename, true, true); // set both to false if you do not want to compute normals + tree
@@ -74,24 +74,10 @@ int main(int argc, char** argv)
     // ----------------------------IS INPUT MESH VALID?------------------------------------
     valid_mesh_boolean(mesh);
 
-    // // -------------------------------------MAT--------------------------------------------
-    // auto pts = _surface_sampling(mesh,relative_alpha);
-    // write_points_as_off("../data/Output/MAT/sampled_points.off",pts);
-    //
-    // std::filesystem::create_directories("../data/Output/MAT/sampled_points");
-    // std::filesystem::create_directories("../data/Output/MAT/result");
-    // write_coords_npy("../data/Output/MAT/sampled_points/coords.npy", pts);
-    // auto normals = normals_for_points_from_closest_face(mesh, tree, face_normals, pts);
-    // write_normals_npy("../data/Output/MAT/sampled_points/normals.npy", normals);
-    // run_masbcpp_compute_ma("../data/Output/MAT/sampled_points","../data/Output/MAT/result");
-    // generate_lfs_ply("../data/Output/MAT/sampled_points","../data/Output/MAT/result","../data/Output/MAT/result/test.ply");
-    // generate_lfs_ply_concave("../data/Output/MAT/sampled_points","../data/Output/MAT/result","../data/Output/MAT/result/test_concave.ply");
-
-
     // ------------------------------ALPHA WRAP INPUT---------------------------------------
     Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, data, true, true, false); // set both to false if you do not want to write out the file and test if valid
     // -------------------------- alpha wrap from inside -----------------------------------
-    // Mesh alpha_inside_wrap = _3D_alpha_inside_wrap( filename,relative_alpha,relative_offset, mesh, false, false);
+    // Mesh alpha_inside_wrap = _3D_alpha_inside_wrap( filename,relative_alpha,relative_offset, mesh, true, false);
 
 
     //     // ----------------- SHARPENING EDGES --------------------

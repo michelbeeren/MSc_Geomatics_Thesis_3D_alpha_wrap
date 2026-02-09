@@ -980,7 +980,7 @@ private:
     const double fs = m_fs_mat_ptr->nearest_feature_size(f_mid);
     const double fs_safe = (fs > 0.0) ? fs : 1e-12;
 
-    const double local_alpha = CGAL::to_double(m_alpha) * std::pow(fs_safe, 0.9);
+    const double local_alpha = CGAL::to_double(m_alpha) * std::pow(fs_safe, 0.85);
     const FT local_sq_alpha = FT(local_alpha * local_alpha);
 
     return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);

@@ -129,13 +129,13 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         auto face_normals = data_.face_normals;
         Tree& tree_ = *data_.tree;
 
-        // sample the input surface
-        auto pts = _surface_sampling(mesh_,relative_alpha_);
-        write_points_as_off("../data/Output/MAT/sampled_points.off",pts);
-
         // create directories for MAT if they do not exist
         std::filesystem::create_directories("../data/Output/MAT/sampled_points");
         std::filesystem::create_directories("../data/Output/MAT/result");
+
+        // sample the input surface
+        auto pts = _surface_sampling(mesh_,relative_alpha_);
+        write_points_as_off("../data/Output/MAT/sampled_points.off",pts);
 
         // write sampled points as npy file
         write_coords_npy("../data/Output/MAT/sampled_points/coords.npy", pts);
@@ -151,7 +151,8 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         generate_lfs_ply("../data/Output/MAT/sampled_points","../data/Output/MAT/result","../data/Output/MAT/result/feature_size.ply");
 
         // ================================= ALPHA_WRAP ===================================
-        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap,
+        const double alpha_mat = alpha * (40.4/std::pow(diag_length,0.93)+1); // for diag length = 12 --> do alpha times 5, for diag length = 300 --> do alpha times 1.2
+        CGAL::alpha_wrap_3(mesh_, alpha_mat, offset, wrap,
                    CGAL::parameters::mat_path("../data/Output/MAT/result/feature_size.ply"));
     }
     else {
@@ -167,6 +168,15 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         std::string output_ = generate_output_name(filename, relative_alpha_, relative_offset_);
         std::filesystem::path p(output_);
         std::filesystem::create_directory(p.parent_path());
+        if (MAT) {
+            // Remove last 4 characters (".off")
+            if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
+                output_ = output_.substr(0, output_.size() - 4);
+            }
+
+            // Add current alpha and offset to the output name
+            output_ += "_MAT.off";
+        }
     std::cout << "📝Writing📝 to: " << output_ << std::endl;
     CGAL::IO::write_polygon_mesh(output_, wrap, CGAL::parameters::stream_precision(25));}
 
@@ -234,7 +244,7 @@ Mesh _3D_alpha_inside_wrap(const std::string filename, const double relative_alp
     };
 
   Mesh wrap;
-  // CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::seed_points(std::ref(seeds)));
+  CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::seed_points(std::ref(seeds)));
 
   t.stop();
     std::cout << "🎁 succesfully alpha wrapped! 🎁: " << num_vertices(wrap) << " 🔘vertices🔘, " << num_faces(wrap) << " 📐faces📐, it took " << t.time() << " s.⏰" << std::endl;
