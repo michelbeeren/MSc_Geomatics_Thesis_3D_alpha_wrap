@@ -25,10 +25,25 @@
 #include <CGAL/property_map.h>
 
 #include <boost/range/has_range_iterator.hpp>
+#include <string>
 
 #include <type_traits>
 
 namespace CGAL {
+    namespace internal_np {
+        struct mat_path_t {};
+        // Tag object, same style as internal_np::geom_traits, etc.
+        static const mat_path_t mat_path = mat_path_t();
+    }
+
+    namespace parameters {
+        // Free function so you can write CGAL::parameters::mat_path("file.ply")
+        inline CGAL::Named_function_parameters<std::string, internal_np::mat_path_t>
+        mat_path(const std::string& p)
+        {
+            return CGAL::Named_function_parameters<std::string, internal_np::mat_path_t>(p);
+        }
+    }
 
 // /////////////////////////////////////////////////////////////////////////////////////////////////
 // WITH A TRIANGLE SOUP ---------------------------------------------------------------------------
@@ -112,6 +127,11 @@ void alpha_wrap_3(const PointRange& points,
   Oracle oracle(alpha, gt);
   oracle.add_triangle_soup(points, faces, in_np);
   AW3 alpha_wrap_builder(oracle);
+
+    const std::string mat = choose_parameter(get_parameter(in_np, internal_np::mat_path), std::string());
+    if(!mat.empty())
+        alpha_wrap_builder.set_mat_path(mat);
+
   alpha_wrap_builder(alpha, offset, alpha_wrap, in_np, out_np);
 }
 
@@ -261,6 +281,11 @@ void alpha_wrap_3(const TriangleMesh& tmesh,
   Oracle oracle(alpha, gt);
   oracle.add_triangle_mesh(tmesh, in_np);
   AW3 alpha_wrap_builder(oracle);
+
+    const std::string mat = choose_parameter(get_parameter(in_np, internal_np::mat_path), std::string());
+    if(!mat.empty())
+        alpha_wrap_builder.set_mat_path(mat);
+
   alpha_wrap_builder(alpha, offset, alpha_wrap, in_np, out_np);
 }
 
@@ -357,6 +382,11 @@ void alpha_wrap_3(const PointRange& points,
   Oracle oracle(gt);
   oracle.add_point_set(points, in_np);
   AW3 alpha_wrap_builder(oracle);
+
+    const std::string mat = choose_parameter(get_parameter(in_np, internal_np::mat_path), std::string());
+    if(!mat.empty())
+        alpha_wrap_builder.set_mat_path(mat);
+
   alpha_wrap_builder(alpha, offset, alpha_wrap, in_np, out_np);
 }
 

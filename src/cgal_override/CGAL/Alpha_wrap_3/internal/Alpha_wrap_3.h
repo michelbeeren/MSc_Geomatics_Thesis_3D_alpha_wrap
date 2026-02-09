@@ -74,6 +74,7 @@
 #include <iterator>
 #include <queue>
 #include <string>
+#include <memory>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -180,13 +181,15 @@ protected:
   SC_Iso_cuboid_3 m_bbox;
   double m_xmid = 0.0, m_ymid = 0.0, m_zmid = 0.0;
 
-  // NEW: nearest feature-size lookup (loads PLY once + KD-tree)
-  // test test
-  // really stupid, but this is the ply file, in where you can look what the approximated feature size is of the nn point
+  // MAT support (optional)
+  bool m_use_mat = false;
+  std::string m_mat_path;
+  mutable std::unique_ptr<CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>> m_fs_mat_ptr;
 
-  // this one for joep_huis
-  mutable CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits> m_fs_mat
-    = CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>("../data/Output/MAT/result/test.ply");
+  // later remove these lines!!!
+  // // this one for joep_huis
+  // mutable CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits> m_fs_mat
+  //   = CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>("../data/Output/MAT/result/test.ply");
 
   // // this one for bk
   // mutable CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits> m_fs_mat
@@ -259,6 +262,23 @@ private:
   }
 
 public:
+  void set_mat_path(const std::string& path)
+  {
+    m_mat_path = path;
+    m_use_mat  = !m_mat_path.empty();
+
+    if(m_use_mat)
+    {
+      // always recreate (cheap enough compared to wrapping)
+      m_fs_mat_ptr = std::make_unique<
+        CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>
+      >(m_mat_path);
+    }
+    else
+    {
+      m_fs_mat_ptr.reset();
+    }
+  }
   template <typename OutputMesh,
             typename InputNamedParameters = parameters::Default_named_parameters,
             typename OutputNamedParameters = parameters::Default_named_parameters>
@@ -405,18 +425,21 @@ public:
 
     visitor.on_alpha_wrapping_end(*this);
     std::cout << "ooh managed to modify the alpha wrap algorithm :)" << std::endl;
-    std::cout << "xmid = " << m_xmid << std::endl;
-    std::cout << "ymid = " << m_ymid << std::endl;
-    std::cout << "zmid = " << m_zmid << std::endl;
-    std::cout << "xmin = " << m_oracle.bbox().xmin() << std::endl;
-    std::cout << "ymin = " << m_oracle.bbox().ymin() << std::endl;
-    std::cout << "zmin = " << m_oracle.bbox().zmin() << std::endl;
-    std::cout << "xmax = " << m_oracle.bbox().xmax() << std::endl;
-    std::cout << "ymax = " << m_oracle.bbox().ymax() << std::endl;
-    std::cout << "zmax = " << m_oracle.bbox().zmax() << std::endl;
+    // std::cout << "xmid = " << m_xmid << std::endl;
+    // std::cout << "ymid = " << m_ymid << std::endl;
+    // std::cout << "zmid = " << m_zmid << std::endl;
+    // std::cout << "xmin = " << m_oracle.bbox().xmin() << std::endl;
+    // std::cout << "ymin = " << m_oracle.bbox().ymin() << std::endl;
+    // std::cout << "zmin = " << m_oracle.bbox().zmin() << std::endl;
+    // std::cout << "xmax = " << m_oracle.bbox().xmax() << std::endl;
+    // std::cout << "ymax = " << m_oracle.bbox().ymax() << std::endl;
+    // std::cout << "zmax = " << m_oracle.bbox().zmax() << std::endl;
   }
 
-  // Convenience overloads
+  // -------------------------------------------------------------------------------------------
+  // Compatibility overload (OLD): keeps CGAL's existing alpha_wrap_3.h wrappers compiling.
+  // Forwards to the new overload with empty MAT_path => behavior A.
+  // -------------------------------------------------------------------------------------------
   template <typename OutputMesh>
   void operator()(const double alpha,
                   OutputMesh& output_mesh)
@@ -424,11 +447,14 @@ public:
     return operator()(alpha, alpha / 30. /*offset*/, output_mesh);
   }
 
+  // Convenience overloads
   template <typename OutputMesh>
   void operator()(OutputMesh& output_mesh)
   {
     return operator()(default_alpha(), output_mesh);
   }
+
+
 
   // This function is public only because it is used in the tests
   SC_Iso_cuboid_3 construct_bbox(const double offset)
@@ -930,10 +956,14 @@ private:
 
   // bool is_traversable(const Facet& f) const { return less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr); }
 
-  // // demo 3
+
   bool is_traversable(const Facet& f) const
   {
-    // --- compute facet midpoint ---
+    // A) default CGAL behavior
+    if(!m_use_mat || !m_fs_mat_ptr)
+      return less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
+
+    // B) MAT-based behavior
     const Cell_handle ch = f.first;
     const int i = f.second;
 
@@ -947,15 +977,42 @@ private:
       (p0.z() + p1.z() + p2.z()) / 3.0
     );
 
-    // --- alpha scaled by nearest MAT feature size ---
-    const double fs = m_fs_mat.nearest_feature_size(f_mid);
+    const double fs = m_fs_mat_ptr->nearest_feature_size(f_mid);
     const double fs_safe = (fs > 0.0) ? fs : 1e-12;
-    const double local_alpha = CGAL::to_double(m_alpha) * std::pow(fs_safe, 0.9);
 
+    const double local_alpha = CGAL::to_double(m_alpha) * std::pow(fs_safe, 0.9);
     const FT local_sq_alpha = FT(local_alpha * local_alpha);
 
     return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
   }
+
+
+  // // // demo 3
+  // bool is_traversable3(const Facet& f) const
+  // {
+  //   // --- compute facet midpoint ---
+  //   const Cell_handle ch = f.first;
+  //   const int i = f.second;
+  //
+  //   const Point_3& p0 = ch->vertex((i+1)&3)->point();
+  //   const Point_3& p1 = ch->vertex((i+2)&3)->point();
+  //   const Point_3& p2 = ch->vertex((i+3)&3)->point();
+  //
+  //   const Point_3 f_mid(
+  //     (p0.x() + p1.x() + p2.x()) / 3.0,
+  //     (p0.y() + p1.y() + p2.y()) / 3.0,
+  //     (p0.z() + p1.z() + p2.z()) / 3.0
+  //   );
+  //
+  //   // --- alpha scaled by nearest MAT feature size ---
+  //   const double fs = m_fs_mat.nearest_feature_size(f_mid);
+  //   const double fs_safe = (fs > 0.0) ? fs : 1e-12;
+  //   const double local_alpha = CGAL::to_double(m_alpha) * std::pow(fs_safe, 0.9);
+  //
+  //   const FT local_sq_alpha = FT(local_alpha * local_alpha);
+  //
+  //   return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
+  // }
 
 
   bool is_traversable2(const Facet& f) const

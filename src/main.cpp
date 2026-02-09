@@ -61,7 +61,7 @@ int main(int argc, char** argv)
     std::cout << "------------------------------------------------------------" << std::endl;
   std::cout << "Reading input: " << filename << std::endl;
 
-  const double relative_alpha = 10; //2000. //20. //1000.
+  const double relative_alpha = 100; //2000. //20. //1000.
   const double relative_offset = 2000.; // 7000. //600. //12000.
 
     // ----------------------MESH INPUT FILE (optional: compute normals and tree)------------------
@@ -89,7 +89,7 @@ int main(int argc, char** argv)
 
 
     // ------------------------------ALPHA WRAP INPUT---------------------------------------
-    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, mesh, true, false); // set both to false if you do not want to write out the file and test if valid
+    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, data, true, true, false); // set both to false if you do not want to write out the file and test if valid
     // -------------------------- alpha wrap from inside -----------------------------------
     // Mesh alpha_inside_wrap = _3D_alpha_inside_wrap( filename,relative_alpha,relative_offset, mesh, false, false);
 

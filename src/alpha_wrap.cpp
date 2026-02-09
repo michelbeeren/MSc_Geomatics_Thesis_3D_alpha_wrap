@@ -34,6 +34,7 @@ using Tree        = CGAL::AABB_tree<AABB_traits>;
 
 #include "alpha_wrap.h"
 #include "val3dity.h"
+#include "MAT.h"
 
 // --------------------------------------MESH INPUT-------------------------------------
 MeshData mesh_input(const std::string& filename, bool compute_normals, bool build_tree)
@@ -103,7 +104,10 @@ std::string generate_output_name(const std::string input_name_, const double rel
 }
 
 // 3D alpha wrap
-Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, Mesh& mesh_, bool write_out_, bool validate) {
+Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool MAT, bool write_out_, bool validate) {
+    // get mesh from input data
+    Mesh& mesh_ = data_.mesh;
+
     // compute alpha and offset from a_rel and d_rel and bbox
     CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh_);
     const double diag_length = std::sqrt(CGAL::square(bbox.xmax() - bbox.xmin()) +
@@ -119,8 +123,40 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
     t.start();
 
     Mesh wrap;
-    CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap);
+    if (MAT) {
+        // ================================= MAT ===================================
+        // get face normals and tree from input data
+        auto face_normals = data_.face_normals;
+        Tree& tree_ = *data_.tree;
 
+        // sample the input surface
+        auto pts = _surface_sampling(mesh_,relative_alpha_);
+        write_points_as_off("../data/Output/MAT/sampled_points.off",pts);
+
+        // create directories for MAT if they do not exist
+        std::filesystem::create_directories("../data/Output/MAT/sampled_points");
+        std::filesystem::create_directories("../data/Output/MAT/result");
+
+        // write sampled points as npy file
+        write_coords_npy("../data/Output/MAT/sampled_points/coords.npy", pts);
+
+        // create and write normals as npy file
+        auto normals = normals_for_points_from_closest_face(mesh_, tree_, face_normals, pts);
+        write_normals_npy("../data/Output/MAT/sampled_points/normals.npy", normals);
+
+        // run MAT
+        run_masbcpp_compute_ma("../data/Output/MAT/sampled_points","../data/Output/MAT/result");
+
+        // generate output ply with points with property 'feature_size'
+        generate_lfs_ply("../data/Output/MAT/sampled_points","../data/Output/MAT/result","../data/Output/MAT/result/feature_size.ply");
+
+        // ================================= ALPHA_WRAP ===================================
+        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap,
+                   CGAL::parameters::mat_path("../data/Output/MAT/result/feature_size.ply"));
+    }
+    else {
+        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap);
+    }
     t.stop();
     std::cout << "🎁 succesfully alpha wrapped! 🎁: " << num_vertices(wrap) << " 🔘vertices🔘, " << num_faces(wrap) << " 📐faces📐, it took " << t.time() << " s.⏰" << std::endl;
     // std::cout << "Took " << t.time() << " s." << std::endl;
@@ -198,7 +234,7 @@ Mesh _3D_alpha_inside_wrap(const std::string filename, const double relative_alp
     };
 
   Mesh wrap;
-  CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::seed_points(std::ref(seeds)));
+  // CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::seed_points(std::ref(seeds)));
 
   t.stop();
     std::cout << "🎁 succesfully alpha wrapped! 🎁: " << num_vertices(wrap) << " 🔘vertices🔘, " << num_faces(wrap) << " 📐faces📐, it took " << t.time() << " s.⏰" << std::endl;
