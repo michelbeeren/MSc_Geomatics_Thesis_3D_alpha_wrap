@@ -32,8 +32,10 @@
 namespace CGAL {
     namespace internal_np {
         struct mat_path_t {};
+        struct octree_t {};
         // Tag object, same style as internal_np::geom_traits, etc.
         static const mat_path_t mat_path = mat_path_t();
+        static const octree_t octree = octree_t();
     }
 
     namespace parameters {
@@ -42,6 +44,12 @@ namespace CGAL {
         mat_path(const std::string& p)
         {
             return CGAL::Named_function_parameters<std::string, internal_np::mat_path_t>(p);
+        }
+
+        inline CGAL::Named_function_parameters<std::vector<CGAL::Bbox_3>, internal_np::octree_t>
+        octree(const std::vector<CGAL::Bbox_3>& cells)
+        {
+            return CGAL::Named_function_parameters<std::vector<CGAL::Bbox_3>, internal_np::octree_t>(cells);
         }
     }
 
@@ -131,6 +139,11 @@ void alpha_wrap_3(const PointRange& points,
     const std::string mat = choose_parameter(get_parameter(in_np, internal_np::mat_path), std::string());
     if(!mat.empty())
         alpha_wrap_builder.set_mat_path(mat);
+
+    const std::vector<CGAL::Bbox_3> cells = choose_parameter(get_parameter(in_np, internal_np::octree), std::vector<CGAL::Bbox_3>());
+    if (!cells.empty()) {
+        alpha_wrap_builder.set_octree(cells);  // Use Octree if cells are provided
+    }
 
   alpha_wrap_builder(alpha, offset, alpha_wrap, in_np, out_np);
 }
@@ -286,6 +299,11 @@ void alpha_wrap_3(const TriangleMesh& tmesh,
     if(!mat.empty())
         alpha_wrap_builder.set_mat_path(mat);
 
+    const std::vector<CGAL::Bbox_3> cells = choose_parameter(get_parameter(in_np, internal_np::octree), std::vector<CGAL::Bbox_3>());
+    if (!cells.empty()) {
+        alpha_wrap_builder.set_octree(cells);  // Use Octree if cells are provided
+    }
+
   alpha_wrap_builder(alpha, offset, alpha_wrap, in_np, out_np);
 }
 
@@ -386,6 +404,11 @@ void alpha_wrap_3(const PointRange& points,
     const std::string mat = choose_parameter(get_parameter(in_np, internal_np::mat_path), std::string());
     if(!mat.empty())
         alpha_wrap_builder.set_mat_path(mat);
+
+    const std::vector<CGAL::Bbox_3> cells = choose_parameter(get_parameter(in_np, internal_np::octree), std::vector<CGAL::Bbox_3>());
+    if (!cells.empty()) {
+        alpha_wrap_builder.set_octree(cells);  // Use Octree if cells are provided
+    }
 
   alpha_wrap_builder(alpha, offset, alpha_wrap, in_np, out_np);
 }

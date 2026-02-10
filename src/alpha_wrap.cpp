@@ -18,8 +18,8 @@
 #include <CGAL/AABB_face_graph_triangle_primitive.h>
 #include <CGAL/AABB_traits.h>
 #include <CGAL/boost/graph/helpers.h>
-#include <boost/variant/get.hpp>
 #include <CGAL/IO/Color.h>
+#include <filesystem>
 
 namespace PMP = CGAL::Polygon_mesh_processing;
 using K = CGAL::Exact_predicates_inexact_constructions_kernel;
@@ -31,10 +31,13 @@ using Segment_3 = K::Segment_3;
 using Primitive   = CGAL::AABB_face_graph_triangle_primitive<Mesh>;
 using AABB_traits = CGAL::AABB_traits<K, Primitive>;
 using Tree        = CGAL::AABB_tree<AABB_traits>;
+using face_descriptor = Mesh::Face_index;
+using Ray_3   = K::Ray_3;
 
 #include "alpha_wrap.h"
 #include "val3dity.h"
 #include "MAT.h"
+#include "octree.h"
 
 // --------------------------------------MESH INPUT-------------------------------------
 MeshData mesh_input(const std::string& filename, bool compute_normals, bool build_tree)
@@ -104,7 +107,148 @@ std::string generate_output_name(const std::string input_name_, const double rel
 }
 
 // 3D alpha wrap
-Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool MAT, bool write_out_, bool validate) {
+Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool MAT, bool Octree, bool write_out_, bool validate) {
+    // get mesh from input data
+    Mesh& mesh_ = data_.mesh;
+
+    // compute alpha and offset from a_rel and d_rel and bbox
+    CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh_);
+    const double diag_length = std::sqrt(CGAL::square(bbox.xmax() - bbox.xmin()) +
+                                         CGAL::square(bbox.ymax() - bbox.ymin()) +
+                                         CGAL::square(bbox.zmax() - bbox.zmin()));
+    const double alpha = diag_length / relative_alpha_;
+    const double offset = diag_length / relative_offset_;
+    std::cout << "--------------------3D ALPHA WRAPPING THE INPUT:----------------" << std::endl;
+    std::cout << "alpha = " << alpha << " (a_rel = " << relative_alpha_ << ") and offset = " << offset << " (offset_rel = " << relative_offset_ << ")" << std::endl;
+
+    // Construct the wrap
+    CGAL::Real_timer t;
+    t.start();
+
+    Mesh wrap;
+
+    // MAT Logic: When MAT is enabled
+    if (MAT) {
+        auto face_normals = data_.face_normals;
+        Tree& tree_ = *data_.tree;
+
+        // Create directories for MAT if they do not exist
+        std::filesystem::create_directories("../data/Output/MAT/sampled_points");
+        std::filesystem::create_directories("../data/Output/MAT/result");
+
+        // Sample the input surface
+        auto pts = _surface_sampling(mesh_, relative_alpha_);
+        write_points_as_off("../data/Output/MAT/sampled_points.off", pts);
+
+        // Write sampled points as npy file
+        write_coords_npy("../data/Output/MAT/sampled_points/coords.npy", pts);
+
+        // Create and write normals as npy file
+        auto normals = normals_for_points_from_closest_face(mesh_, tree_, face_normals, pts);
+        write_normals_npy("../data/Output/MAT/sampled_points/normals.npy", normals);
+
+        // Run MAT
+        run_masbcpp_compute_ma("../data/Output/MAT/sampled_points", "../data/Output/MAT/result");
+
+        // Generate output ply with points with property 'feature_size'
+        generate_lfs_ply("../data/Output/MAT/sampled_points", "../data/Output/MAT/result", "../data/Output/MAT/result/feature_size.ply");
+
+        // Alpha wrap using MAT
+        const double alpha_mat = alpha * (40.4 / std::pow(diag_length, 0.93) + 1); // for diag length = 12 --> do alpha times 5
+        CGAL::alpha_wrap_3(mesh_, alpha_mat, offset, wrap,
+                   CGAL::parameters::mat_path("../data/Output/MAT/result/feature_size.ply"));
+    }
+
+    // Octree Logic: When Octree is enabled
+    if (Octree) {
+        auto face_normals = data_.face_normals;
+
+        // --- CRITICAL FIX: Rebuild the tree ---
+        // This ensures the tree is looking at the current memory address of mesh_
+        data_.tree = std::make_unique<Tree>(faces(mesh_).begin(), faces(mesh_).end(), mesh_);
+        Tree& tree_ = *data_.tree;
+
+        // Debug check: If this says 0, the mesh itself is empty!
+        std::cout << "Tree rebuilt with " << tree_.size() << " primitives." << std::endl;
+
+        // Create root
+        OctreeCell root;
+        CGAL::Bbox_3 tight = CGAL::Polygon_mesh_processing::bbox(mesh_);
+
+        // ... (Your cx, cy, cz, half logic) ...
+
+        // Center of the bounding box
+        double cx = 0.5 * (tight.xmin() + tight.xmax());
+        double cy = 0.5 * (tight.ymin() + tight.ymax());
+        double cz = 0.5 * (tight.zmin() + tight.zmax());
+
+        // Largest half-extent to make the root a perfect cube
+        double half = std::max({
+            0.5 * (tight.xmax() - tight.xmin()),
+            0.5 * (tight.ymax() - tight.ymin()),
+            0.5 * (tight.zmax() - tight.zmin())
+        });
+
+        root.bbox = CGAL::Bbox_3(cx - half, cy - half, cz - half,
+                                 cx + half, cy + half, cz + half);
+        root.depth = 0;
+
+        // Run refinement
+        refine_cell(root, tree_, face_normals);
+
+        // Collect using the new Bbox_3 vector type
+        std::vector<CGAL::Bbox_3> cubes2;
+        collect_intersecting_leaves_verified(root, tree_, cubes2);
+
+        std::cout << "Leaf cells: " << cubes2.size() << std::endl;
+
+        // Pass to Alpha Wrap
+        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap,
+                           CGAL::parameters::octree(cubes2));
+
+        // Write wireframe
+        write_off_wireframe(cubes2, "../data/Output/3DBAG_Buildings/Octree_refinement.off");
+    }
+    else {
+        // Default: call alpha_wrap_3 without MAT or Octree
+        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap);
+    }
+
+    t.stop();
+    std::cout << "🎁 Successfully alpha wrapped! 🎁: " << num_vertices(wrap) << " 🔘vertices🔘, "
+              << num_faces(wrap) << " 📐faces📐, it took " << t.time() << " s.⏰" << std::endl;
+
+    // Write the output mesh
+    if (write_out_) {
+        std::string output_ = generate_output_name(filename, relative_alpha_, relative_offset_);
+        std::filesystem::path p(output_);
+        std::filesystem::create_directory(p.parent_path());
+        if (MAT) {
+            if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
+                output_ = output_.substr(0, output_.size() - 4);
+            }
+            output_ += "_MAT.off";
+        }
+        if (Octree) {
+            if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
+                output_ = output_.substr(0, output_.size() - 4);
+            }
+            output_ += "_Octree.off";
+        }
+        std::cout << "📝 Writing 📝 to: " << output_ << std::endl;
+        CGAL::IO::write_polygon_mesh(output_, wrap, CGAL::parameters::stream_precision(25));
+    }
+
+    // ----------------------------- validate the output ------------------------------
+    if (validate) {
+        valid_mesh_boolean(wrap);
+    }
+    std::cout << "---------------------------------------------------------------" << std::endl;
+
+    return wrap;
+}
+
+Mesh _3D_alpha_wrap2(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool MAT, bool Octree, bool write_out_, bool validate) {
     // get mesh from input data
     Mesh& mesh_ = data_.mesh;
 

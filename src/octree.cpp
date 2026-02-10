@@ -33,17 +33,17 @@ using Tree        = CGAL::AABB_tree<AABB_traits>;
 
 // --------------------------------OCTREE REFINEMENT-----------------------------------
 
-struct OctreeCell {
-    CGAL::Bbox_3 bbox;
-    int depth = 0;
-    std::vector<Mesh::Face_index> faces;
-    std::array<std::unique_ptr<OctreeCell>, 8> children;
-
-    OctreeCell() {
-        for (auto& c : children)
-            c = nullptr;
-    }
-};
+// struct OctreeCell {
+//     CGAL::Bbox_3 bbox;
+//     int depth = 0;
+//     std::vector<Mesh::Face_index> faces;
+//     std::array<std::unique_ptr<OctreeCell>, 8> children;
+//
+//     OctreeCell() {
+//         for (auto& c : children)
+//             c = nullptr;
+//     }
+// };
 
 void collect_faces( OctreeCell& cell, const Tree& tree) {
     cell.faces.clear();
@@ -213,88 +213,125 @@ void refine_cell(OctreeCell& cell, const Tree& tree, const std::map<Mesh::Face_i
         refine_cell(*child, tree, face_normals);
 }
 
-struct LeafCell {
-    CGAL::Bbox_3 bbox;
-};
-
-void collect_leaves( const OctreeCell& cell, std::vector<LeafCell>& leaves ) {
-    bool is_leaf = true;
-    for (const auto& c : cell.children)
-        if (c) is_leaf = false;
-
-    if (is_leaf) {
-        leaves.push_back({cell.bbox});
+// struct LeafCell {
+//     CGAL::Bbox_3 bbox;
+// };
+void collect_leaves(const OctreeCell& cell, std::vector<CGAL::Bbox_3>& leaves) {
+    if (is_leaf(cell)) {
+        leaves.push_back(cell.bbox); // Push bbox directly
         return;
     }
-
     for (const auto& c : cell.children)
         if (c) collect_leaves(*c, leaves);
 }
 
-void write_off_wireframe( const std::vector<LeafCell>& cells, const std::string& filename) {
+// void collect_leaves2( const OctreeCell& cell, std::vector<LeafCell>& leaves ) {
+//     bool is_leaf = true;
+//     for (const auto& c : cell.children)
+//         if (c) is_leaf = false;
+//
+//     if (is_leaf) {
+//         leaves.push_back({cell.bbox});
+//         return;
+//     }
+//
+//     for (const auto& c : cell.children)
+//         if (c) collect_leaves(*c, leaves);
+// }
+
+void write_off_wireframe(const std::vector<CGAL::Bbox_3>& cells, const std::string& filename) {
     std::ofstream out(filename);
-    if (!out) {
-        std::cerr << "Error: cannot open output file " << filename << "\n";
-        return;
+    if (!out) return;
+
+    out << std::fixed << std::setprecision(17) << "OFF\n";
+    out << cells.size() * 8 << " " << cells.size() * 6 << " 0\n";
+
+    for (const auto& b : cells) { // b is now the Bbox_3 directly
+        out << b.xmin() << " " << b.ymin() << " " << b.zmin() << "\n";
+        out << b.xmax() << " " << b.ymin() << " " << b.zmin() << "\n";
+        out << b.xmax() << " " << b.ymax() << " " << b.zmin() << "\n";
+        out << b.xmin() << " " << b.ymax() << " " << b.zmin() << "\n";
+        out << b.xmin() << " " << b.ymin() << " " << b.zmax() << "\n";
+        out << b.xmax() << " " << b.ymin() << " " << b.zmax() << "\n";
+        out << b.xmax() << " " << b.ymax() << " " << b.zmax() << "\n";
+        out << b.xmin() << " " << b.ymax() << " " << b.zmax() << "\n";
     }
 
-    // set write precision higher
-    out << std::fixed << std::setprecision(17);
-
-    constexpr int VERTS_PER_CELL = 8;
-    constexpr int FACES_PER_CELL = 6; // 6 quad faces per box
-
-    const std::size_t numVertices = cells.size() * VERTS_PER_CELL;
-    const std::size_t numFaces    = cells.size() * FACES_PER_CELL;
-
-    // ------------------------------------------------------------------
-    // OFF header
-    // ------------------------------------------------------------------
-    out << "OFF\n";
-    out << numVertices << " " << numFaces << " 0\n";
-
-    // ------------------------------------------------------------------
-    // Write vertices
-    // ------------------------------------------------------------------
-    for (const auto& c : cells) {
-        const auto& b = c.bbox;
-
-        const double x0 = b.xmin(), x1 = b.xmax();
-        const double y0 = b.ymin(), y1 = b.ymax();
-        const double z0 = b.zmin(), z1 = b.zmax();
-
-        out << x0 << " " << y0 << " " << z0 << "\n"; // 0
-        out << x1 << " " << y0 << " " << z0 << "\n"; // 1
-        out << x1 << " " << y1 << " " << z0 << "\n"; // 2
-        out << x0 << " " << y1 << " " << z0 << "\n"; // 3
-        out << x0 << " " << y0 << " " << z1 << "\n"; // 4
-        out << x1 << " " << y0 << " " << z1 << "\n"; // 5
-        out << x1 << " " << y1 << " " << z1 << "\n"; // 6
-        out << x0 << " " << y1 << " " << z1 << "\n"; // 7
-    }
-
-    // ------------------------------------------------------------------
-    // Write quad faces (boxes)
-    // ------------------------------------------------------------------
     std::size_t v = 0;
     for (std::size_t i = 0; i < cells.size(); ++i) {
-
-        // bottom
         out << "4 " << v+0 << " " << v+1 << " " << v+2 << " " << v+3 << "\n";
-        // top
         out << "4 " << v+4 << " " << v+5 << " " << v+6 << " " << v+7 << "\n";
-
-        // sides
         out << "4 " << v+0 << " " << v+1 << " " << v+5 << " " << v+4 << "\n";
         out << "4 " << v+1 << " " << v+2 << " " << v+6 << " " << v+5 << "\n";
         out << "4 " << v+2 << " " << v+3 << " " << v+7 << " " << v+6 << "\n";
         out << "4 " << v+3 << " " << v+0 << " " << v+4 << " " << v+7 << "\n";
-
-        v += VERTS_PER_CELL;
+        v += 8;
     }
-
-    out.close();
 }
+// void write_off_wireframe( const std::vector<LeafCell>& cells, const std::string& filename) {
+//     std::ofstream out(filename);
+//     if (!out) {
+//         std::cerr << "Error: cannot open output file " << filename << "\n";
+//         return;
+//     }
+//
+//     // set write precision higher
+//     out << std::fixed << std::setprecision(17);
+//
+//     constexpr int VERTS_PER_CELL = 8;
+//     constexpr int FACES_PER_CELL = 6; // 6 quad faces per box
+//
+//     const std::size_t numVertices = cells.size() * VERTS_PER_CELL;
+//     const std::size_t numFaces    = cells.size() * FACES_PER_CELL;
+//
+//     // ------------------------------------------------------------------
+//     // OFF header
+//     // ------------------------------------------------------------------
+//     out << "OFF\n";
+//     out << numVertices << " " << numFaces << " 0\n";
+//
+//     // ------------------------------------------------------------------
+//     // Write vertices
+//     // ------------------------------------------------------------------
+//     for (const auto& c : cells) {
+//         const auto& b = c.bbox;
+//
+//         const double x0 = b.xmin(), x1 = b.xmax();
+//         const double y0 = b.ymin(), y1 = b.ymax();
+//         const double z0 = b.zmin(), z1 = b.zmax();
+//
+//         out << x0 << " " << y0 << " " << z0 << "\n"; // 0
+//         out << x1 << " " << y0 << " " << z0 << "\n"; // 1
+//         out << x1 << " " << y1 << " " << z0 << "\n"; // 2
+//         out << x0 << " " << y1 << " " << z0 << "\n"; // 3
+//         out << x0 << " " << y0 << " " << z1 << "\n"; // 4
+//         out << x1 << " " << y0 << " " << z1 << "\n"; // 5
+//         out << x1 << " " << y1 << " " << z1 << "\n"; // 6
+//         out << x0 << " " << y1 << " " << z1 << "\n"; // 7
+//     }
+//
+//     // ------------------------------------------------------------------
+//     // Write quad faces (boxes)
+//     // ------------------------------------------------------------------
+//     std::size_t v = 0;
+//     for (std::size_t i = 0; i < cells.size(); ++i) {
+//
+//         // bottom
+//         out << "4 " << v+0 << " " << v+1 << " " << v+2 << " " << v+3 << "\n";
+//         // top
+//         out << "4 " << v+4 << " " << v+5 << " " << v+6 << " " << v+7 << "\n";
+//
+//         // sides
+//         out << "4 " << v+0 << " " << v+1 << " " << v+5 << " " << v+4 << "\n";
+//         out << "4 " << v+1 << " " << v+2 << " " << v+6 << " " << v+5 << "\n";
+//         out << "4 " << v+2 << " " << v+3 << " " << v+7 << " " << v+6 << "\n";
+//         out << "4 " << v+3 << " " << v+0 << " " << v+4 << " " << v+7 << "\n";
+//
+//         v += VERTS_PER_CELL;
+//     }
+//
+//     out.close();
+// }
 
 bool is_leaf(const OctreeCell& cell) {
     for (const auto& c : cell.children)
@@ -303,22 +340,29 @@ bool is_leaf(const OctreeCell& cell) {
     return true;
 }
 
-void collect_intersecting_leaves( const OctreeCell& cell, std::vector<LeafCell>& out ) {
-    // Case 1: leaf cell
+void collect_intersecting_leaves(const OctreeCell& cell, std::vector<CGAL::Bbox_3>& out) {
     if (is_leaf(cell)) {
-        // Only keep it if it intersects the mesh
-        if (!cell.faces.empty()) {
-            out.push_back({cell.bbox});
-        }
+        if (!cell.faces.empty()) out.push_back(cell.bbox);
         return;
     }
-
-    // Case 2: internal node → recurse
-    for (const auto& c : cell.children) {
-        if (c)
-            collect_intersecting_leaves(*c, out);
-    }
+    for (const auto& c : cell.children) if (c) collect_intersecting_leaves(*c, out);
 }
+// void collect_intersecting_leaves( const OctreeCell& cell, std::vector<LeafCell>& out ) {
+//     // Case 1: leaf cell
+//     if (is_leaf(cell)) {
+//         // Only keep it if it intersects the mesh
+//         if (!cell.faces.empty()) {
+//             out.push_back({cell.bbox});
+//         }
+//         return;
+//     }
+//
+//     // Case 2: internal node → recurse
+//     for (const auto& c : cell.children) {
+//         if (c)
+//             collect_intersecting_leaves(*c, out);
+//     }
+// }
 
 bool intersects_mesh_bbox(const CGAL::Bbox_3& bbox, const Tree& tree) {
     std::vector<Primitive::Id> hits;
@@ -326,24 +370,24 @@ bool intersects_mesh_bbox(const CGAL::Bbox_3& bbox, const Tree& tree) {
     return !hits.empty();
 }
 
-void collect_cubical_leaves_at_depth( const OctreeCell& cell, int target_depth, std::vector<LeafCell>& out ) {
-    // Leaf at the right depth
-    if (cell.depth == target_depth) {
-        bool is_leaf = true;
-        for (const auto& c : cell.children)
-            if (c) { is_leaf = false; break; }
-
-        if (is_leaf && !cell.faces.empty()) {
-            out.push_back({cell.bbox});
-        }
-        return;
-    }
-
-    // Recurse
-    for (const auto& c : cell.children)
-        if (c)
-            collect_cubical_leaves_at_depth(*c, target_depth, out);
-}
+// void collect_cubical_leaves_at_depth( const OctreeCell& cell, int target_depth, std::vector<LeafCell>& out ) {
+//     // Leaf at the right depth
+//     if (cell.depth == target_depth) {
+//         bool is_leaf = true;
+//         for (const auto& c : cell.children)
+//             if (c) { is_leaf = false; break; }
+//
+//         if (is_leaf && !cell.faces.empty()) {
+//             out.push_back({cell.bbox});
+//         }
+//         return;
+//     }
+//
+//     // Recurse
+//     for (const auto& c : cell.children)
+//         if (c)
+//             collect_cubical_leaves_at_depth(*c, target_depth, out);
+// }
 
 void find_max_depth(const OctreeCell& cell, int& max_depth) {
     max_depth = std::max(max_depth, cell.depth);
@@ -369,36 +413,50 @@ void find_max_intersecting_leaf_depth( const OctreeCell& cell, int& max_depth ) 
             find_max_intersecting_leaf_depth(*c, max_depth);
 }
 
-void collect_finest_intersecting_leaves( const OctreeCell& cell, int target_depth, std::vector<LeafCell>& out ) {
-    bool is_leaf = true;
-    for (const auto& c : cell.children)
-        if (c) { is_leaf = false; break; }
-
-    if (is_leaf) {
-        if (cell.depth == target_depth && !cell.faces.empty()) {
-            out.push_back({cell.bbox});
-        }
+void collect_finest_intersecting_leaves(const OctreeCell& cell, int target_depth, std::vector<CGAL::Bbox_3>& out) {
+    if (is_leaf(cell)) {
+        if (cell.depth == target_depth && !cell.faces.empty()) out.push_back(cell.bbox);
         return;
     }
-
-    for (const auto& c : cell.children)
-        if (c)
-            collect_finest_intersecting_leaves(*c, target_depth, out);
+    for (const auto& c : cell.children) if (c) collect_finest_intersecting_leaves(*c, target_depth, out);
 }
+// void collect_finest_intersecting_leaves( const OctreeCell& cell, int target_depth, std::vector<LeafCell>& out ) {
+//     bool is_leaf = true;
+//     for (const auto& c : cell.children)
+//         if (c) { is_leaf = false; break; }
+//
+//     if (is_leaf) {
+//         if (cell.depth == target_depth && !cell.faces.empty()) {
+//             out.push_back({cell.bbox});
+//         }
+//         return;
+//     }
+//
+//     for (const auto& c : cell.children)
+//         if (c)
+//             collect_finest_intersecting_leaves(*c, target_depth, out);
+// }
 
-void collect_intersecting_leaves_verified( const OctreeCell& cell, const Tree& tree, std::vector<LeafCell>& out ){
-    bool is_leaf = true;
-    for (const auto& c : cell.children)
-        if (c) { is_leaf = false; break; }
-
-    if (is_leaf) {
-        if (intersects_mesh_bbox(cell.bbox, tree)) {
-            out.push_back({cell.bbox});
-        }
+void collect_intersecting_leaves_verified(const OctreeCell& cell, const Tree& tree, std::vector<CGAL::Bbox_3>& out) {
+    if (is_leaf(cell)) {
+        if (intersects_mesh_bbox(cell.bbox, tree)) out.push_back(cell.bbox);
         return;
     }
-
-    for (const auto& c : cell.children)
-        if (c)
-            collect_intersecting_leaves_verified(*c, tree, out);
+    for (const auto& c : cell.children) if (c) collect_intersecting_leaves_verified(*c, tree, out);
 }
+// void collect_intersecting_leaves_verified( const OctreeCell& cell, const Tree& tree, std::vector<LeafCell>& out ){
+//     bool is_leaf = true;
+//     for (const auto& c : cell.children)
+//         if (c) { is_leaf = false; break; }
+//
+//     if (is_leaf) {
+//         if (intersects_mesh_bbox(cell.bbox, tree)) {
+//             out.push_back({cell.bbox});
+//         }
+//         return;
+//     }
+//
+//     for (const auto& c : cell.children)
+//         if (c)
+//             collect_intersecting_leaves_verified(*c, tree, out);
+// }

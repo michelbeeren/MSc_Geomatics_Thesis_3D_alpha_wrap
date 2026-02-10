@@ -31,6 +31,7 @@
 
 #include <CGAL/license/Alpha_wrap_3.h>
 #include <CGAL/Alpha_wrap_3/internal/Feature_size_MAT.h>
+#include <CGAL/Alpha_wrap_3/internal/Octree_refinement_depth.h>
 
 #include <CGAL/Alpha_wrap_3/internal/Alpha_wrap_triangulation_cell_base_3.h>
 #include <CGAL/Alpha_wrap_3/internal/Alpha_wrap_triangulation_vertex_base_3.h>
@@ -186,6 +187,13 @@ protected:
   std::string m_mat_path;
   mutable std::unique_ptr<CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>> m_fs_mat_ptr;
 
+
+  // Octree support (optional)
+  bool m_use_octree = false;
+  std::vector<CGAL::Bbox_3> m_cells;  // New member to store the octree path
+  mutable std::unique_ptr<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>> m_octree_ptr;
+
+
   // later remove these lines!!!
   // // this one for joep_huis
   // mutable CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits> m_fs_mat
@@ -279,6 +287,20 @@ public:
       m_fs_mat_ptr.reset();
     }
   }
+
+  void set_octree(const std::vector<CGAL::Bbox_3>& cells)
+  {
+    m_cells = cells;
+    m_use_octree = !m_cells.empty();  // Check if cells are available
+
+    if (m_use_octree) {
+      // Create the octree from the cells (implement how to build the octree)
+      m_octree_ptr = std::make_unique<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>>(m_cells);
+    } else {
+      m_octree_ptr.reset();  // Reset the octree if no cells are provided
+    }
+  }
+
   template <typename OutputMesh,
             typename InputNamedParameters = parameters::Default_named_parameters,
             typename OutputNamedParameters = parameters::Default_named_parameters>
@@ -956,8 +978,67 @@ private:
 
   // bool is_traversable(const Facet& f) const { return less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr); }
 
+bool is_traversable(const Facet& f) const
+{
+    // A) Default CGAL behavior: when neither MAT nor Octree is used
+    if ((!m_use_mat || !m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr)) {
+        return less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
+    }
 
-  bool is_traversable(const Facet& f) const
+    // B) MAT-based behavior: when MAT is used
+    if ((m_use_mat && m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr)) {
+        const Cell_handle ch = f.first;
+        const int i = f.second;
+
+        const Point_3& p0 = ch->vertex((i + 1) & 3)->point();
+        const Point_3& p1 = ch->vertex((i + 2) & 3)->point();
+        const Point_3& p2 = ch->vertex((i + 3) & 3)->point();
+
+        const Point_3 f_mid(
+            (p0.x() + p1.x() + p2.x()) / 3.0,
+            (p0.y() + p1.y() + p2.y()) / 3.0,
+            (p0.z() + p1.z() + p2.z()) / 3.0
+        );
+
+        const double fs = m_fs_mat_ptr->nearest_feature_size(f_mid);
+        const double fs_safe = (fs > 0.0) ? fs : 1e-12;
+
+        const double local_alpha = CGAL::to_double(m_alpha) / fs_safe; // alpha*3 for ref_depth=1, alpha*0.3 for ref_depth=9
+        const FT local_sq_alpha = FT(local_alpha * local_alpha);
+
+        return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
+    }
+
+    // C) Octree-based behavior: when Octree is used but no MAT
+    if ((m_use_octree && m_octree_ptr) && (!m_use_mat || !m_fs_mat_ptr)) {
+        const Cell_handle ch = f.first;
+        const int i = f.second;
+
+        const Point_3& p0 = ch->vertex((i + 1) & 3)->point();
+        const Point_3& p1 = ch->vertex((i + 2) & 3)->point();
+        const Point_3& p2 = ch->vertex((i + 3) & 3)->point();
+
+        const Point_3 f_mid(
+            (p0.x() + p1.x() + p2.x()) / 3.0,
+            (p0.y() + p1.y() + p2.y()) / 3.0,
+            (p0.z() + p1.z() + p2.z()) / 3.0
+        );
+
+        // Calculate the refinement depth based on the Octree
+        const double fs = m_octree_ptr->nearest_refinement_depth(f_mid); // Use octree refinement depth
+
+        const double fs_safe = (fs > 0.0) ? fs : 1e-12;
+      const double local_alpha = CGAL::to_double(m_alpha) * (-0.3 * fs_safe + 3.3);
+        const FT local_sq_alpha = FT(local_alpha * local_alpha);
+
+        return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
+    }
+
+    // D) Default case: if no MAT or Octree is provided, use the original logic.
+    return less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
+}
+
+  bool is_traversable2(const Facet& f) const
   {
     // A) default CGAL behavior
     if(!m_use_mat || !m_fs_mat_ptr)
@@ -981,72 +1062,6 @@ private:
     const double fs_safe = (fs > 0.0) ? fs : 1e-12;
 
     const double local_alpha = CGAL::to_double(m_alpha) * std::pow(fs_safe, 0.85);
-    const FT local_sq_alpha = FT(local_alpha * local_alpha);
-
-    return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
-  }
-
-
-  // // // demo 3
-  // bool is_traversable3(const Facet& f) const
-  // {
-  //   // --- compute facet midpoint ---
-  //   const Cell_handle ch = f.first;
-  //   const int i = f.second;
-  //
-  //   const Point_3& p0 = ch->vertex((i+1)&3)->point();
-  //   const Point_3& p1 = ch->vertex((i+2)&3)->point();
-  //   const Point_3& p2 = ch->vertex((i+3)&3)->point();
-  //
-  //   const Point_3 f_mid(
-  //     (p0.x() + p1.x() + p2.x()) / 3.0,
-  //     (p0.y() + p1.y() + p2.y()) / 3.0,
-  //     (p0.z() + p1.z() + p2.z()) / 3.0
-  //   );
-  //
-  //   // --- alpha scaled by nearest MAT feature size ---
-  //   const double fs = m_fs_mat.nearest_feature_size(f_mid);
-  //   const double fs_safe = (fs > 0.0) ? fs : 1e-12;
-  //   const double local_alpha = CGAL::to_double(m_alpha) * std::pow(fs_safe, 0.9);
-  //
-  //   const FT local_sq_alpha = FT(local_alpha * local_alpha);
-  //
-  //   return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
-  // }
-
-
-  bool is_traversable2(const Facet& f) const
-  {
-    // --- compute facet midpoint ---
-    const Cell_handle ch = f.first;
-    const int i = f.second;
-
-    const Point_3& p0 = ch->vertex((i+1)&3)->point();
-    const Point_3& p1 = ch->vertex((i+2)&3)->point();
-    const Point_3& p2 = ch->vertex((i+3)&3)->point();
-
-    const Point_3 f_mid(
-      (p0.x() + p1.x() + p2.x()) / 3.0,
-      (p0.y() + p1.y() + p2.y()) / 3.0,
-      (p0.z() + p1.z() + p2.z()) / 3.0
-    );
-
-    // --- classify using PRECOMPUTED mid-planes ---
-    const bool left   = CGAL::to_double(f_mid.x()) < m_xmid;
-    const bool bottom = CGAL::to_double(f_mid.y()) < m_ymid;
-    const bool front  = CGAL::to_double(f_mid.z()) < m_zmid;
-
-    double local_alpha = CGAL::to_double(m_alpha);
-
-    if ( left &&  bottom &&  front) local_alpha = CGAL::to_double(m_alpha) * 2.0;
-    if ( left &&  bottom && !front) local_alpha = CGAL::to_double(m_alpha) * 4.0;
-    if ( left && !bottom &&  front) local_alpha = CGAL::to_double(m_alpha);
-    if ( left && !bottom && !front) local_alpha = CGAL::to_double(m_alpha) * 0.5;
-    if (!left &&  bottom &&  front) local_alpha = CGAL::to_double(m_alpha) * 6.0;
-    if (!left &&  bottom && !front) local_alpha = CGAL::to_double(m_alpha) * 1.5;
-    if (!left && !bottom &&  front) local_alpha = CGAL::to_double(m_alpha) / 3.0;
-    if (!left && !bottom && !front) local_alpha = CGAL::to_double(m_alpha) * 5.0;
-
     const FT local_sq_alpha = FT(local_alpha * local_alpha);
 
     return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
