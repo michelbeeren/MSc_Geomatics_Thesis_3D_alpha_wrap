@@ -238,6 +238,9 @@ void write_off_wireframe( const std::vector<LeafCell>& cells, const std::string&
         return;
     }
 
+    // set write precision higher
+    out << std::fixed << std::setprecision(17);
+
     constexpr int VERTS_PER_CELL = 8;
     constexpr int FACES_PER_CELL = 6; // 6 quad faces per box
 
