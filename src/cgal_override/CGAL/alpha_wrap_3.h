@@ -137,8 +137,9 @@ void alpha_wrap_3(const PointRange& points,
   AW3 alpha_wrap_builder(oracle);
 
     const std::string mat = choose_parameter(get_parameter(in_np, internal_np::mat_path), std::string());
-    if(!mat.empty())
+    if(!mat.empty()) {
         alpha_wrap_builder.set_mat_path(mat);
+    }
 
     const std::vector<CGAL::Bbox_3> cells = choose_parameter(get_parameter(in_np, internal_np::octree), std::vector<CGAL::Bbox_3>());
     if (!cells.empty()) {
@@ -296,8 +297,9 @@ void alpha_wrap_3(const TriangleMesh& tmesh,
   AW3 alpha_wrap_builder(oracle);
 
     const std::string mat = choose_parameter(get_parameter(in_np, internal_np::mat_path), std::string());
-    if(!mat.empty())
+    if(!mat.empty()) {
         alpha_wrap_builder.set_mat_path(mat);
+    }
 
     const std::vector<CGAL::Bbox_3> cells = choose_parameter(get_parameter(in_np, internal_np::octree), std::vector<CGAL::Bbox_3>());
     if (!cells.empty()) {
@@ -402,8 +404,9 @@ void alpha_wrap_3(const PointRange& points,
   AW3 alpha_wrap_builder(oracle);
 
     const std::string mat = choose_parameter(get_parameter(in_np, internal_np::mat_path), std::string());
-    if(!mat.empty())
+    if(!mat.empty()) {
         alpha_wrap_builder.set_mat_path(mat);
+    }
 
     const std::vector<CGAL::Bbox_3> cells = choose_parameter(get_parameter(in_np, internal_np::octree), std::vector<CGAL::Bbox_3>());
     if (!cells.empty()) {

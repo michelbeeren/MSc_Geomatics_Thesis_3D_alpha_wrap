@@ -978,7 +978,7 @@ private:
 
   // bool is_traversable(const Facet& f) const { return less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr); }
 
-bool is_traversable(const Facet& f) const
+bool is_traversable2(const Facet& f) const
 {
     // A) Default CGAL behavior: when neither MAT nor Octree is used
     if ((!m_use_mat || !m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr)) {
@@ -986,7 +986,7 @@ bool is_traversable(const Facet& f) const
     }
 
     // B) MAT-based behavior: when MAT is used
-    if ((m_use_mat && m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr)) {
+    if ((m_use_mat || m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr)) {
         const Cell_handle ch = f.first;
         const int i = f.second;
 
@@ -1003,14 +1003,14 @@ bool is_traversable(const Facet& f) const
         const double fs = m_fs_mat_ptr->nearest_feature_size(f_mid);
         const double fs_safe = (fs > 0.0) ? fs : 1e-12;
 
-        const double local_alpha = CGAL::to_double(m_alpha) / fs_safe; // alpha*3 for ref_depth=1, alpha*0.3 for ref_depth=9
+        const double local_alpha = CGAL::to_double(m_alpha) * std::pow(fs_safe, 0.85); // alpha*3 for ref_depth=1, alpha*0.3 for ref_depth=9
         const FT local_sq_alpha = FT(local_alpha * local_alpha);
 
         return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
     }
 
     // C) Octree-based behavior: when Octree is used but no MAT
-    if ((m_use_octree && m_octree_ptr) && (!m_use_mat || !m_fs_mat_ptr)) {
+    if (m_use_octree) {
         const Cell_handle ch = f.first;
         const int i = f.second;
 
@@ -1038,7 +1038,7 @@ bool is_traversable(const Facet& f) const
     return less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
 }
 
-  bool is_traversable2(const Facet& f) const
+  bool is_traversable(const Facet& f) const
   {
     // A) default CGAL behavior
     if(!m_use_mat || !m_fs_mat_ptr)
