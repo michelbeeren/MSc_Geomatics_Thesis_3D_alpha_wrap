@@ -294,12 +294,23 @@ public:
     m_use_octree = !m_cells.empty();  // Check if cells are available
 
     if (m_use_octree) {
-      // Create the octree from the cells (implement how to build the octree)
-      m_octree_ptr = std::make_unique<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>>(m_cells);
+      // Convert Bbox_3 into OctreeCell and populate the vector of OctreeCell
+      std::vector<OctreeCell> octree_cells;
+      for (const auto& bbox : m_cells) {
+        // Directly construct OctreeCell in the vector using emplace_back
+        octree_cells.emplace_back();
+        octree_cells.back().bbox = bbox;
+        octree_cells.back().depth = 0;  // You can set the depth based on your criteria
+      }
+
+      // Now create the Octree_refinement_depth instance
+      m_octree_ptr = std::make_unique<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>>(std::move(octree_cells));
     } else {
       m_octree_ptr.reset();  // Reset the octree if no cells are provided
     }
   }
+
+
 
   template <typename OutputMesh,
             typename InputNamedParameters = parameters::Default_named_parameters,
@@ -1023,12 +1034,24 @@ bool is_traversable(const Facet& f) const
             (p0.y() + p1.y() + p2.y()) / 3.0,
             (p0.z() + p1.z() + p2.z()) / 3.0
         );
+      std::cout << "f_mid: " << f_mid.x() << ", " << f_mid.y() << ", " << f_mid.z() << std::endl;
+
 
         // Calculate the refinement depth based on the Octree
         const double fs = m_octree_ptr->nearest_refinement_depth(f_mid); // Use octree refinement depth
 
-        const double fs_safe = (fs > 0.0) ? fs : 1e-12;
-      const double local_alpha = CGAL::to_double(m_alpha) * (-0.3 * fs_safe + 3.3);
+        // const double fs_safe = (fs > 0.0) ? fs : 1e-12;
+      std::cout << "fs: " << fs << std::endl;
+
+      // set the alpha size
+      const double scaler_ = 6.; // alpha_max 'scaler' times larger, then alpha_min
+      const double max_ref_depth_ = 6.; // Based on actual max_ref depth #todo should at some point be automatic
+      const double dy_dx_ = (0.5*(1-scaler_))/(max_ref_depth_ - 1);
+      const double local_alpha = dy_dx_*CGAL::to_double(m_alpha)*fs + (scaler_ - dy_dx_)*CGAL::to_double(m_alpha);
+      std::cout << "alpha = " << m_alpha << " , local alpha = " << local_alpha << std::endl;
+
+
+      // const double local_alpha = CGAL::to_double(m_alpha) * (-0.3 * fs_safe + 3.3);
         const FT local_sq_alpha = FT(local_alpha * local_alpha);
 
         return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
@@ -1037,35 +1060,6 @@ bool is_traversable(const Facet& f) const
     // D) Default case: if no MAT or Octree is provided, use the original logic.
     return less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
 }
-
-  bool is_traversable2(const Facet& f) const
-  {
-    // A) default CGAL behavior
-    if(!m_use_mat || !m_fs_mat_ptr)
-      return less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
-
-    // B) MAT-based behavior
-    const Cell_handle ch = f.first;
-    const int i = f.second;
-
-    const Point_3& p0 = ch->vertex((i+1)&3)->point();
-    const Point_3& p1 = ch->vertex((i+2)&3)->point();
-    const Point_3& p2 = ch->vertex((i+3)&3)->point();
-
-    const Point_3 f_mid(
-      (p0.x() + p1.x() + p2.x()) / 3.0,
-      (p0.y() + p1.y() + p2.y()) / 3.0,
-      (p0.z() + p1.z() + p2.z()) / 3.0
-    );
-
-    const double fs = m_fs_mat_ptr->nearest_feature_size(f_mid);
-    const double fs_safe = (fs > 0.0) ? fs : 1e-12;
-
-    const double local_alpha = CGAL::to_double(m_alpha) * std::pow(fs_safe, 0.85);
-    const FT local_sq_alpha = FT(local_alpha * local_alpha);
-
-    return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
-  }
 
 
   bool compute_steiner_point(const Cell_handle ch,

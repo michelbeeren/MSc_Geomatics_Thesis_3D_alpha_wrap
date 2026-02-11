@@ -128,7 +128,7 @@ bool surface_is_simple( const std::vector<Mesh::Face_index>& faces, const std::m
 }
 
 bool needs_refinement( const OctreeCell& cell, const std::map<Mesh::Face_index, K::Vector_3>& face_normals) {
-    constexpr int max_depth = 9;
+    constexpr int max_depth = 6;
     constexpr double cone_angle =
         10.0 * M_PI / 180.0; // strict!
 

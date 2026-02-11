@@ -1,78 +1,83 @@
-//
-// Created by Michel Beeren on 10/02/2026.
-//
-
 #ifndef CGAL_ALPHA_WRAP_3_OCTREE_REFINEMENT_DEPTH_H
 #define CGAL_ALPHA_WRAP_3_OCTREE_REFINEMENT_DEPTH_H
 
-#include <fstream>
-#include <string>
-#include <vector>
-#include <stdexcept>
-#include <memory>
-
-#include <CGAL/Bbox_3.h>  // For Bbox_3, assuming you're using CGAL bounding boxes
-#include <CGAL/Point_3.h>  // For Point_3, assuming you're using CGAL points
+#include "../../../../octree.h"// Ensure this path is correct for your project structure
+//
 
 namespace CGAL {
 namespace Alpha_wrap_3 {
 namespace internal {
 
-// Class to compute the refinement depth based on bounding boxes.
 template <class Kernel>
-class Octree_refinement_depth
-{
+class Octree_refinement_depth {
+    std::unique_ptr<OctreeCell> m_root;
+
 public:
-  using Point_3 = typename Kernel::Point_3;
-  using Bbox_3  = CGAL::Bbox_3;  // Assuming cells are represented as Bbox_3 objects
+    using Point_3 = typename Kernel::Point_3;
+    // Constructor takes ownership of the built octree root
+    Octree_refinement_depth(std::unique_ptr<OctreeCell> root)
+        : m_root(std::move(root)) {}
 
-  // Default constructor
-  Octree_refinement_depth() = default;
+    /**
+     * Finds the leaf cell containing the point p and returns its depth.
+     * If the point is outside the octree, it returns 0 (the root depth).
+     */
+    double nearest_refinement_depth(const Point_3& p) const {
+        if (!m_root) return 0.0;
 
-  // Constructor that accepts the cells (bounding boxes)
-  explicit Octree_refinement_depth(const std::vector<Bbox_3>& cells)
-    : m_cells(cells)
-  {}
+        // If the point is completely outside the octree, return base depth
+        if (p.x() < m_root->bbox.xmin() || p.x() > m_root->bbox.xmax() ||
+            p.y() < m_root->bbox.ymin() || p.y() > m_root->bbox.ymax() ||
+            p.z() < m_root->bbox.zmin() || p.z() > m_root->bbox.zmax()) {
+            return 0.0;
+        }
 
-  // Function to set the cells (bounding boxes) if needed
-  void set_cells(const std::vector<Bbox_3>& cells)
-  {
-    m_cells = cells;
-  }
-
-  // Function to return the refinement depth of the cell containing the point
-  int nearest_refinement_depth(const Point_3& q) const
-  {
-    for (std::size_t i = 0; i < m_cells.size(); ++i)
-    {
-      // Check if point q lies inside the bounding box by comparing coordinates
-      if (q.x() >= m_cells[i].xmin() && q.x() <= m_cells[i].xmax() &&
-          q.y() >= m_cells[i].ymin() && q.y() <= m_cells[i].ymax() &&
-          q.z() >= m_cells[i].zmin() && q.z() <= m_cells[i].zmax())  // Check for inclusion in Bbox_3
-      {
-        return get_refinement_depth(i);  // Return the refinement depth for the cell
-      }
+        return find_depth_recursive(m_root.get(), p);
     }
 
-    return 1;  // Default refinement depth if point is not inside any cell
-  }
-
 private:
-  // Function to get the refinement depth for a given cell (based on index)
-  // You may need to implement this based on your own criteria.
-  int get_refinement_depth(std::size_t cell_index) const
-  {
-    // For now, we return a mock refinement depth based on the cell index.
-    // Implement your refinement depth logic here.
-    return static_cast<int>(cell_index + 1);  // Example: depth is just the index + 1
-  }
+    double find_depth_recursive(const OctreeCell* cell, const Point_3& p) const {
+        // Base case: if it's a leaf, return current depth
+        bool is_leaf = true;
+        for (const auto& child : cell->children) {
+            if (child) {
+                is_leaf = false;
+                break;
+            }
+        }
 
-private:
-  std::vector<Bbox_3> m_cells;  // Cells (bounding boxes) representing the octree structure
+        if (is_leaf) {
+            return static_cast<double>(cell->depth);
+        }
+
+        // Recursive step: Find which child contains the point
+        // Using the same midpoint logic as your subdivide() function
+        const CGAL::Bbox_3& b = cell->bbox;
+        double mx = 0.5 * (b.xmin() + b.xmax());
+        double my = 0.5 * (b.ymin() + b.ymax());
+        double mz = 0.5 * (b.zmin() + b.zmax());
+
+        // Standard Octree indexing (as defined in your subdivide function):
+        // 0: min_x, min_y, min_z | 1: max_x, min_y, min_z | 2: max_x, max_y, min_z ...
+        int index = 0;
+        if (p.x() >= mx) index += 1;
+        if (p.y() >= my) index += 2; // Assuming index 2 & 3 have y > my based on your code
+        if (p.z() >= mz) index += 4;
+
+        // Note: Check your subdivide() layout to ensure the index matches perfectly.
+        // Based on your specific subdivide implementation:
+        // children[0-3] are z < mz, children[4-7] are z >= mz.
+
+        // Safety check for null children (though a balanced tree shouldn't have them)
+        if (cell->children[index]) {
+            return find_depth_recursive(cell->children[index].get(), p);
+        }
+
+        return static_cast<double>(cell->depth);
+    }
 };
 
 } // namespace internal
 } // namespace Alpha_wrap_3
 } // namespace CGAL
-
 #endif // CGAL_ALPHA_WRAP_3_OCTREE_REFINEMENT_DEPTH_H

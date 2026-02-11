@@ -37,7 +37,7 @@ using Ray_3   = K::Ray_3;
 #include "alpha_wrap.h"
 #include "val3dity.h"
 #include "MAT.h"
-#include "octree.h"
+// #include "octree.h"
 
 // --------------------------------------MESH INPUT-------------------------------------
 MeshData mesh_input(const std::string& filename, bool compute_normals, bool build_tree)
@@ -207,8 +207,7 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
 
         // Pass to Alpha Wrap
         std::cout << "..........Running Octree alpha wrap algorithm.........." << std::endl;
-        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap,
-                           CGAL::parameters::octree(cubes2));
+        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::octree(cubes2));
 
     }
     if ((!Octree && !MAT) || (Octree && MAT)) {
