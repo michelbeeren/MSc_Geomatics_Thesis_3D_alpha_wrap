@@ -68,7 +68,7 @@ int main(int argc, char** argv)
     auto data = mesh_input(filename, true, true); // set both to false if you do not want to compute normals + tree
     Mesh& mesh = data.mesh;
     auto face_normals = data.face_normals;
-    std::cout << "does this work? face_normals.size = " << face_normals.size() << std::endl;
+    std::cout << "face_normals.size = " << face_normals.size() << std::endl;
     Tree& tree = *data.tree;
 
     // ----------------------------IS INPUT MESH VALID?------------------------------------
@@ -76,7 +76,7 @@ int main(int argc, char** argv)
 
 
     // ------------------------------ALPHA WRAP INPUT---------------------------------------
-    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, data, true, false, true, false); // set both to false if you do not want to write out the file and test if valid
+    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, data, false, true, true, false); // set both to false if you do not want to write out the file and test if valid
     // -------------------------- alpha wrap from inside -----------------------------------
     // Mesh alpha_inside_wrap = _3D_alpha_inside_wrap( filename,relative_alpha,relative_offset, mesh, true, false);
 

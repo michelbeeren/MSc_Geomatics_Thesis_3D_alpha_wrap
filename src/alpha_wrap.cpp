@@ -128,7 +128,7 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
     Mesh wrap;
 
     // MAT Logic: When MAT is enabled
-    if (MAT) {
+    if (MAT && !Octree) {
         auto face_normals = data_.face_normals;
         Tree& tree_ = *data_.tree;
 
@@ -154,13 +154,14 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         generate_lfs_ply("../data/Output/MAT/sampled_points", "../data/Output/MAT/result", "../data/Output/MAT/result/feature_size.ply");
 
         // Alpha wrap using MAT
-        const double alpha_mat = alpha * (40.4 / std::pow(diag_length, 0.93) + 1); // for diag length = 12 --> do alpha times 5
+        const double alpha_mat = alpha * (40.4 / std::pow(diag_length, 0.93) + 1);
+        std::cout << "..........Running MAT alpha wrap algorithm.........." << std::endl;// for diag length = 12 --> do alpha times 5
         CGAL::alpha_wrap_3(mesh_, alpha_mat, offset, wrap,
                    CGAL::parameters::mat_path("../data/Output/MAT/result/feature_size.ply"));
     }
 
     // Octree Logic: When Octree is enabled
-    if (Octree) {
+    if (Octree && !MAT) {
         auto face_normals = data_.face_normals;
 
         // --- CRITICAL FIX: Rebuild the tree ---
@@ -201,16 +202,18 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         collect_intersecting_leaves_verified(root, tree_, cubes2);
 
         std::cout << "Leaf cells: " << cubes2.size() << std::endl;
+        // Write wireframe
+        write_off_wireframe(cubes2, "../data/Output/3DBAG_Buildings/Octree_refinement.off");
 
         // Pass to Alpha Wrap
+        std::cout << "..........Running Octree alpha wrap algorithm.........." << std::endl;
         CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap,
                            CGAL::parameters::octree(cubes2));
 
-        // Write wireframe
-        write_off_wireframe(cubes2, "../data/Output/3DBAG_Buildings/Octree_refinement.off");
     }
-    else {
+    if ((!Octree && !MAT) || (Octree && MAT)) {
         // Default: call alpha_wrap_3 without MAT or Octree
+        std::cout << "..........Running normal alpha wrap algorithm.........." << std::endl;
         CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap);
     }
 
@@ -223,13 +226,13 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         std::string output_ = generate_output_name(filename, relative_alpha_, relative_offset_);
         std::filesystem::path p(output_);
         std::filesystem::create_directory(p.parent_path());
-        if (MAT) {
+        if (MAT && !Octree) {
             if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
                 output_ = output_.substr(0, output_.size() - 4);
             }
             output_ += "_MAT.off";
         }
-        if (Octree) {
+        if (Octree && !MAT) {
             if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
                 output_ = output_.substr(0, output_.size() - 4);
             }
