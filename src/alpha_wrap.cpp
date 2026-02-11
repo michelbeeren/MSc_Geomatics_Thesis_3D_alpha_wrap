@@ -173,7 +173,7 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         std::cout << "Tree rebuilt with " << tree_.size() << " primitives." << std::endl;
 
         // Create root
-        OctreeCell root;
+        Thesis::OctreeCell root;
         CGAL::Bbox_3 tight = CGAL::Polygon_mesh_processing::bbox(mesh_);
 
         // ... (Your cx, cy, cz, half logic) ...
@@ -203,7 +203,7 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
 
         std::cout << "Leaf cells: " << cubes2.size() << std::endl;
         // Write wireframe
-        write_off_wireframe(cubes2, "../data/Output/3DBAG_Buildings/Octree_refinement.off");
+        Thesis::write_off_wireframe(cubes2, "../data/Output/3DBAG_Buildings/Octree_refinement.off");
 
         // Pass to Alpha Wrap
         std::cout << "..........Running Octree alpha wrap algorithm.........." << std::endl;

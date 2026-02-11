@@ -291,22 +291,32 @@ public:
   void set_octree(const std::vector<CGAL::Bbox_3>& cells)
   {
     m_cells = cells;
-    m_use_octree = !m_cells.empty();  // Check if cells are available
+    m_use_octree = !m_cells.empty();
 
     if (m_use_octree) {
-      // Convert Bbox_3 into OctreeCell and populate the vector of OctreeCell
-      std::vector<OctreeCell> octree_cells;
+      // 1. Find the largest side length to determine "root" scale
+      double max_side = 0.0;
       for (const auto& bbox : m_cells) {
-        // Directly construct OctreeCell in the vector using emplace_back
-        octree_cells.emplace_back();
-        octree_cells.back().bbox = bbox;
-        octree_cells.back().depth = 0;  // You can set the depth based on your criteria
+        max_side = (std::max)({max_side, bbox.xmax()-bbox.xmin(), bbox.ymax()-bbox.ymin(), bbox.zmax()-bbox.zmin()});
       }
 
-      // Now create the Octree_refinement_depth instance
+      std::vector<Thesis::OctreeCell> octree_cells;
+      for (const auto& bbox : m_cells) {
+        octree_cells.emplace_back();
+        octree_cells.back().bbox = bbox;
+
+        // 2. Calculate depth: depth = log2(root_side / current_side)
+        double current_side = bbox.xmax() - bbox.xmin();
+        if (current_side > 0) {
+          octree_cells.back().depth = static_cast<int>(std::round(std::log2(max_side / current_side)));
+        } else {
+          octree_cells.back().depth = 0;
+        }
+      }
+
       m_octree_ptr = std::make_unique<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>>(std::move(octree_cells));
     } else {
-      m_octree_ptr.reset();  // Reset the octree if no cells are provided
+      m_octree_ptr.reset();
     }
   }
 
