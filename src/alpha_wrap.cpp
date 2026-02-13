@@ -20,6 +20,9 @@
 #include <CGAL/boost/graph/helpers.h>
 #include <CGAL/IO/Color.h>
 #include <filesystem>
+#include <CGAL/Polyhedron_3.h>
+// #include <CGAL/Polyhedron_traits_3.h> // Uncomment if needed, but this is often not required for basic operations
+#include <filesystem>
 
 namespace PMP = CGAL::Polygon_mesh_processing;
 using K = CGAL::Exact_predicates_inexact_constructions_kernel;
@@ -37,7 +40,57 @@ using Ray_3   = K::Ray_3;
 #include "alpha_wrap.h"
 #include "val3dity.h"
 #include "MAT.h"
-// #include "octree.h"
+#include "octree.h"
+
+std::map<Mesh::Face_index, std::set<Mesh::Face_index>> create_adjacency_map(const Mesh& mesh) {
+    std::map<Mesh::Face_index, std::set<Mesh::Face_index>> adjacency_map;
+
+    for (auto f : mesh.faces()) {
+        for (auto h : mesh.halfedges_around_face(mesh.halfedge(f))) {
+            auto opp_h = mesh.opposite(h);
+            if (!mesh.is_border(opp_h)) {
+                Mesh::Face_index neighbor = mesh.face(opp_h);
+                adjacency_map[f].insert(neighbor);
+            }
+        }
+    }
+    return adjacency_map;
+}
+// std::map<Mesh::Face_index, std::set<Mesh::Face_index>> create_adjacency_map(const Mesh& mesh) {
+//     std::map<Mesh::Face_index, std::set<Mesh::Face_index>> adjacency_map;
+//
+//     // Iterate over all faces in the mesh
+//     for (auto f : mesh.faces()) {
+//         Mesh::Face_index current_face = f;
+//
+//         // Get the edges of the current face
+//         std::set<std::pair<Mesh::Vertex_index, Mesh::Vertex_index>> edges;
+//         auto he = mesh.halfedges_around_face(mesh.halfedge(current_face));
+//         for (auto h : he) {
+//             auto v1 = mesh.source(h);
+//             auto v2 = mesh.target(h);
+//             if (v1 > v2) std::swap(v1, v2);  // Ensure consistent ordering
+//             edges.insert({v1, v2});
+//         }
+//
+//         // For each edge of the current face, check if any other face shares that edge
+//         for (auto edge : edges) {
+//             // Get the halfedge corresponding to this edge
+//             auto halfedge = mesh.halfedge(edge.first, edge.second);
+//             auto opp_h = mesh.opposite(halfedge); // Get the other side of the edge
+//             auto opposite_face = mesh.face(opp_h); // This is the actual neighbor
+//
+//             // If the opposite face exists and is different, add it to the adjacency map
+//             if (opposite_face != Mesh::null_face()) {
+//                 adjacency_map[current_face].insert(opposite_face);
+//                 adjacency_map[opposite_face].insert(current_face);  // Bidirectional adjacency
+//             }
+//         }
+//     }
+//
+//
+//     return adjacency_map;
+// }
 
 // --------------------------------------MESH INPUT-------------------------------------
 MeshData mesh_input(const std::string& filename, bool compute_normals, bool build_tree)
@@ -73,9 +126,14 @@ MeshData mesh_input(const std::string& filename, bool compute_normals, bool buil
         }
     }
 
+    // Create adjacency map
+    out.adjacency_map = create_adjacency_map(out.mesh);
+
     std::cout << "Input file successfully meshed" << std::endl;
     return out;
 }
+
+
 
 // --------------------------------------ALPHA WRAP-------------------------------------
 // generate output name
@@ -156,8 +214,7 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         // Alpha wrap using MAT
         const double alpha_mat = alpha * (40.4 / std::pow(diag_length, 0.93) + 1);
         std::cout << "..........Running MAT alpha wrap algorithm.........." << std::endl;// for diag length = 12 --> do alpha times 5
-        CGAL::alpha_wrap_3(mesh_, alpha_mat, offset, wrap,
-                   CGAL::parameters::mat_path("../data/Output/MAT/result/feature_size.ply"));
+        CGAL::alpha_wrap_3(mesh_, alpha_mat, offset, wrap, CGAL::parameters::mat_path("../data/Output/MAT/result/feature_size.ply"));
     }
 
     // Octree Logic: When Octree is enabled
@@ -195,7 +252,7 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         root.depth = 0;
 
         // Run refinement
-        refine_cell(root, tree_, face_normals);
+        refine_cell(root, mesh_, tree_, face_normals);
 
         // Collect using the new Bbox_3 vector type
         std::vector<CGAL::Bbox_3> cubes2;
@@ -206,8 +263,8 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         Thesis::write_off_wireframe(cubes2, "../data/Output/3DBAG_Buildings/Octree_refinement.off");
 
         // Pass to Alpha Wrap
-        std::cout << "..........Running Octree alpha wrap algorithm.........." << std::endl;
-        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::octree(cubes2));
+        // std::cout << "..........Running Octree alpha wrap algorithm.........." << std::endl;
+        // CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::octree(cubes2));
 
     }
     if ((!Octree && !MAT) || (Octree && MAT)) {

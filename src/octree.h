@@ -44,9 +44,10 @@ double normal_variance(const std::vector<Mesh::Face_index>& faces, const std::ma
 bool has_sharp_feature(const std::vector<Mesh::Face_index>& faces, const std::map<Mesh::Face_index, K::Vector_3>& normals, double angle_threshold_rad);
 double distance_to_surface(const OctreeCell& cell, const Tree& tree);
 bool surface_is_simple(const std::vector<Mesh::Face_index>& faces, const std::map<Mesh::Face_index, K::Vector_3>& normals, double max_angle_rad);
-bool needs_refinement(const OctreeCell& cell, const std::map<Mesh::Face_index, K::Vector_3>& face_normals);
+bool needs_refinement(const OctreeCell& cell, const std::map<Mesh::Face_index, K::Vector_3>& face_normals, const std::map<Mesh::Face_index, std::set<Mesh::Face_index>>& adjacency_map);
 void subdivide(OctreeCell& cell);
-void refine_cell(OctreeCell& cell, const Tree& tree, const std::map<Mesh::Face_index, K::Vector_3>& face_normals);
+void refine_cell(OctreeCell& cell, const Mesh& mesh, const Tree& tree, const std::map<Mesh::Face_index, K::Vector_3>& face_normals);
+// void refine_cell(OctreeCell& cell, const Tree& tree, const std::map<Mesh::Face_index, K::Vector_3>& face_normals, const std::map<Mesh::Face_index, std::set<Mesh::Face_index>>& adjacency_map);
 bool is_leaf(const OctreeCell& cell);
 bool intersects_mesh_bbox(const CGAL::Bbox_3& bbox, const Tree& tree);
 void find_max_depth(const OctreeCell& cell, int& max_depth);

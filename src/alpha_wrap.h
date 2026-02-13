@@ -6,9 +6,10 @@
 #define THESIS_ALPHA_WRAP_H
 #include "octree.h"
 struct MeshData {
-    Mesh mesh;
-    std::map<Mesh::Face_index, K::Vector_3> face_normals;
-    std::unique_ptr<Tree> tree;  // optional
+    Mesh mesh;  // CGAL Surface_mesh type
+    std::map<Mesh::Face_index, K::Vector_3> face_normals;  // Normals of the faces indexed by Face_index
+    std::unique_ptr<Tree> tree;  // Optional octree structure
+    std::map<Mesh::Face_index, std::set<Mesh::Face_index>> adjacency_map;  // Adjacency map of faces indexed by Face_index
 };
 
 // struct LeafCell {CGAL::Bbox_3 bbox;};

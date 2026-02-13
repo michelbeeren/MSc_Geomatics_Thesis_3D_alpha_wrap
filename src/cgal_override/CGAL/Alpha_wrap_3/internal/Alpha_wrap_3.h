@@ -1044,23 +1044,23 @@ bool is_traversable(const Facet& f) const
             (p0.y() + p1.y() + p2.y()) / 3.0,
             (p0.z() + p1.z() + p2.z()) / 3.0
         );
-      std::cout << "f_mid: " << f_mid.x() << ", " << f_mid.y() << ", " << f_mid.z() << std::endl;
+      // std::cout << "f_mid: " << f_mid.x() << ", " << f_mid.y() << ", " << f_mid.z() << std::endl;
 
 
         // Calculate the refinement depth based on the Octree
         const double fs = m_octree_ptr->nearest_refinement_depth(f_mid); // Use octree refinement depth
       // 1. Parameters
       const double alpha_val = CGAL::to_double(m_alpha);
-      const double scaler = 10.0;
-      const double max_ref = 4.0;
+      const double scaler = 6.0;
+      const double max_ref = 7.0;
 
       const double a_ = (0.2*alpha_val*(1-scaler))/max_ref;
       const double b_ = 0.2*scaler*alpha_val;
 
-      double local_alpha = a_*fs + b_;
+      // double local_alpha = a_*fs + b_;
+      double local_alpha = alpha_val*(std::pow((5-fs),1.5)/4);
 
-      std::cout << "fs: " << fs
-                << " | local_alpha: " << local_alpha << " vs alpha " << m_alpha << "vs alpha_double: " << alpha_val << std::endl;
+      // std::cout << "fs: " << fs << " | local_alpha: " << local_alpha << " vs alpha " << m_alpha << std::endl;
         const FT local_sq_alpha = FT(local_alpha * local_alpha);
 
         return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);

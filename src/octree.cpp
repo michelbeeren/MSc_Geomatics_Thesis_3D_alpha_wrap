@@ -60,10 +60,175 @@ bool surface_is_simple(const std::vector<Mesh::Face_index>& faces, const std::ma
     return true;
 }
 
-bool needs_refinement(const OctreeCell& cell, const std::map<Mesh::Face_index, K::Vector_3>& face_normals) {
-    if (cell.depth >= 6 || cell.faces.empty()) return false;
-    return !surface_is_simple(cell.faces, face_normals, 10.0 * M_PI / 180.0);
+    // Update your is_concave_edge to include a sharpness threshold
+bool is_sharp_concave_edge(const Mesh& mesh,
+                               Mesh::Halfedge_index h,
+                               const std::map<Mesh::Face_index, K::Vector_3>& normals,
+                               double min_angle_rad) {
+    if (mesh.is_border(h) || mesh.is_border(mesh.opposite(h))) return false;
+
+    Mesh::Face_index f1 = mesh.face(h);
+    Mesh::Face_index f2 = mesh.face(mesh.opposite(h));
+
+    const auto& n1 = normals.at(f1);
+    const auto& n2 = normals.at(f2);
+
+    // 1. Sharpness Check: Angle between normals
+    // n1 and n2 are unit vectors (or should be).
+    // Dot product = cos(theta). If cos(theta) < cos(threshold), the angle is bigger.
+    double cos_theta = (n1 * n2) / std::sqrt(n1.squared_length() * n2.squared_length());
+    if (cos_theta > std::cos(min_angle_rad)) {
+        return false; // Not sharp enough
+    }
+
+    // 2. Concavity Check: Does it bend inward?
+    Point_3 p_opposite = mesh.point(mesh.target(mesh.next(mesh.opposite(h))));
+    Point_3 p_on_edge = mesh.point(mesh.target(h));
+    K::Vector_3 v = p_opposite - p_on_edge;
+
+    return (v * n1) > 0.000001;
 }
+
+bool is_concave_edge(const Mesh& mesh,
+                         Mesh::Halfedge_index h,
+                         const std::map<Mesh::Face_index, K::Vector_3>& normals) {
+    // A border edge cannot be concave (it has no neighbor)
+    if (mesh.is_border(h) || mesh.is_border(mesh.opposite(h))) return false;
+
+    Mesh::Face_index f1 = mesh.face(h);
+    Mesh::Face_index f2 = mesh.face(mesh.opposite(h));
+
+    const auto& n1 = normals.at(f1);
+
+    // Get a point on the neighboring face f2 that is NOT on the shared edge
+    // mesh.next(mesh.opposite(h)) gives us the halfedge leading to the 'opposite' vertex
+    Point_3 p_opposite = mesh.point(mesh.target(mesh.next(mesh.opposite(h))));
+    Point_3 p_on_edge = mesh.point(mesh.target(h));
+
+    // Vector from the edge to the opposite vertex
+    K::Vector_3 v = p_opposite - p_on_edge;
+
+    // If the dot product is positive, the neighbor face is pointing "inward"
+    // relative to the current face's normal.
+    return (v * n1) > 0.000001; // Small epsilon for float precision
+}
+
+bool surface_is_simple_concave(const std::vector<Mesh::Face_index>& faces,
+                                const std::map<Mesh::Face_index, K::Vector_3>& normals,
+                                double max_angle_rad,
+                                const std::map<Mesh::Face_index, std::set<Mesh::Face_index>>& adjacency_map) {
+    if (faces.size() < 2) return true;  // No adjacent faces to compare
+
+    // Iterate through each face and its neighbors
+    for (const auto& f : faces) {
+        const auto& n0 = normals.at(f);
+
+        // Get the neighbors of face f
+        auto neighbors = adjacency_map.at(f);
+
+        // Check each neighboring face
+        for (const auto& neighbor : neighbors) {
+            const auto& n1 = normals.at(neighbor);
+
+            // Compute the cosine of the angle between the normals of the two faces
+            double cosang = (n0 * n1) / std::sqrt(n0.squared_length() * n1.squared_length());
+            double angle = std::acos(std::clamp(cosang, -1.0, 1.0));
+
+            // Debug: Print angle and cosine to help diagnose the issue
+            std::cout << "Angle between faces: " << angle * 180.0 / M_PI << " degrees\n";
+
+            // If the angle is too small (close to zero), skip this neighbor and continue with the next one
+            double angle_degrees_ = angle * 180.0 / M_PI;
+            if (angle_degrees_ < 10) {
+                std::cout << "Skipping refinement due to small angle: " << angle_degrees_ << " degrees\n";
+                continue;  // Skip refinement for nearly parallel faces (angle < 2 degrees)
+            }
+
+            // If the angle is larger than the threshold
+            if (angle > max_angle_rad) {
+                // If normals are facing towards each other (dot product < 0), it's concave
+                if ((n0 * n1) < 0) {
+                    std::cout << "Concave sharp feature detected: " << angle_degrees_ << " degrees\n";
+                    return false;  // Concave sharp feature detected, split the cell
+                }
+            }
+        }
+    }
+
+    return true;  // No concave feature found
+}
+
+bool needs_refinement(const OctreeCell& cell,
+                      const Mesh& mesh,
+                      const std::map<Mesh::Face_index, K::Vector_3>& face_normals,
+                      double threshold_rad) {
+
+    if (cell.depth >= 9 || cell.faces.empty()) return false;
+
+    for (auto f : cell.faces) {
+        for (auto h : mesh.halfedges_around_face(mesh.halfedge(f))) {
+
+            // Check if the edge is sharp AND concave
+            if (is_sharp_concave_edge(mesh, h, face_normals, threshold_rad)) {
+
+                // Spatial check: is the concave edge inside this specific cell?
+                Point_3 p1 = mesh.point(mesh.source(h));
+                Point_3 p2 = mesh.point(mesh.target(h));
+
+                if (CGAL::do_intersect(cell.bbox, K::Segment_3(p1, p2))) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+    // UPDATE THIS: You must pass 'mesh' down through refine_cell now
+void refine_cell(OctreeCell& cell,
+                     const Mesh& mesh, // Added Mesh parameter
+                     const Tree& tree,
+                     const std::map<Mesh::Face_index, K::Vector_3>& face_normals) {
+
+    collect_faces(cell, tree);
+
+    // Using 10 degrees as an example threshold
+    double threshold = 10.0 * M_PI / 180.0;
+
+    if (!needs_refinement(cell, mesh, face_normals, threshold)) return;
+
+    subdivide(cell);
+    for (auto& child : cell.children) {
+        if (child) refine_cell(*child, mesh, tree, face_normals);
+    }
+}
+
+
+// bool needs_refinement(const OctreeCell& cell,
+//                           const Mesh& mesh,
+//                           const std::map<Mesh::Face_index, K::Vector_3>& face_normals) {
+//     if (cell.depth >= 9 || cell.faces.empty()) return false;
+//
+//     for (auto f : cell.faces) {
+//         // Iterate over the 3 halfedges of this face
+//         for (auto h : mesh.halfedges_around_face(mesh.halfedge(f))) {
+//
+//             // 1. Check if this edge is concave
+//             if (is_concave_edge(mesh, h, face_normals)) {
+//
+//                 // 2. Spatial Check: Is this concave edge actually inside the current cell?
+//                 Point_3 p1 = mesh.point(mesh.source(h));
+//                 Point_3 p2 = mesh.point(mesh.target(h));
+//
+//                 // We refine only if the concave edge segment intersects the cell bbox
+//                 if (CGAL::do_intersect(cell.bbox, K::Segment_3(p1, p2))) {
+//                     return true; // Concave feature found inside this cell!
+//                 }
+//             }
+//         }
+//     }
+//     return false;
+// }
 
 void subdivide(OctreeCell& cell) {
     const CGAL::Bbox_3& b = cell.bbox;
@@ -88,12 +253,12 @@ void subdivide(OctreeCell& cell) {
     cell.children[7] = make_child(b.xmin(), my, mz, mx, b.ymax(), b.zmax());
 }
 
-void refine_cell(OctreeCell& cell, const Tree& tree, const std::map<Mesh::Face_index, K::Vector_3>& face_normals) {
-    collect_faces(cell, tree);
-    if (!needs_refinement(cell, face_normals)) return;
-    subdivide(cell);
-    for (auto& child : cell.children) refine_cell(*child, tree, face_normals);
-}
+// void refine_cell(OctreeCell& cell, const Tree& tree, const std::map<Mesh::Face_index, K::Vector_3>& face_normals, const std::map<Mesh::Face_index, std::set<Mesh::Face_index>>& adjacency_map) {
+//     collect_faces(cell, tree);
+//     if (!needs_refinement(cell, face_normals, adjacency_map)) return;
+//     subdivide(cell);
+//     for (auto& child : cell.children) refine_cell(*child, tree, face_normals, adjacency_map);
+// }
 
 bool is_leaf(const OctreeCell& cell) {
     for (const auto& c : cell.children) if (c) return false;
@@ -108,6 +273,7 @@ void collect_leaves(const OctreeCell& cell, std::vector<CGAL::Bbox_3>& leaves) {
 void write_off_wireframe(const std::vector<CGAL::Bbox_3>& cells, const std::string& filename) {
     std::ofstream out(filename);
     if (!out) return;
+    out << std::fixed << std::setprecision(17);
     out << "OFF\n" << cells.size() * 8 << " " << cells.size() * 6 << " 0\n";
     for (const auto& b : cells) {
         out << b.xmin() << " " << b.ymin() << " " << b.zmin() << "\n" << b.xmax() << " " << b.ymin() << " " << b.zmin() << "\n";
