@@ -1058,9 +1058,9 @@ bool is_traversable(const Facet& f) const
       const double b_ = 0.2*scaler*alpha_val;
 
       // double local_alpha = a_*fs + b_;
-      double local_alpha = alpha_val*(std::pow((5-fs),1.5)/4);
+      double local_alpha = 0.3*alpha_val;
 
-      // std::cout << "fs: " << fs << " | local_alpha: " << local_alpha << " vs alpha " << m_alpha << std::endl;
+      std::cout << "fs: " << fs << " | local_alpha: " << local_alpha << " vs alpha " << m_alpha << std::endl;
         const FT local_sq_alpha = FT(local_alpha * local_alpha);
 
         return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);

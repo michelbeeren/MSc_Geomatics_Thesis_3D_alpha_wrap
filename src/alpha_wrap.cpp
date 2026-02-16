@@ -220,57 +220,50 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
     // Octree Logic: When Octree is enabled
     if (Octree && !MAT) {
         auto face_normals = data_.face_normals;
-
-        // --- CRITICAL FIX: Rebuild the tree ---
-        // This ensures the tree is looking at the current memory address of mesh_
         data_.tree = std::make_unique<Tree>(faces(mesh_).begin(), faces(mesh_).end(), mesh_);
         Tree& tree_ = *data_.tree;
 
-        // Debug check: If this says 0, the mesh itself is empty!
-        std::cout << "Tree rebuilt with " << tree_.size() << " primitives." << std::endl;
-
-        // Create root
         Thesis::OctreeCell root;
         CGAL::Bbox_3 tight = CGAL::Polygon_mesh_processing::bbox(mesh_);
 
-        // ... (Your cx, cy, cz, half logic) ...
-
-        // Center of the bounding box
+        // Make it a cube
         double cx = 0.5 * (tight.xmin() + tight.xmax());
         double cy = 0.5 * (tight.ymin() + tight.ymax());
         double cz = 0.5 * (tight.zmin() + tight.zmax());
+        double half = 0.501 * std::max({ tight.xmax() - tight.xmin(), tight.ymax() - tight.ymin(), tight.zmax() - tight.zmin()});
 
-        // Largest half-extent to make the root a perfect cube
-        double half = std::max({
-            0.5 * (tight.xmax() - tight.xmin()),
-            0.5 * (tight.ymax() - tight.ymin()),
-            0.5 * (tight.zmax() - tight.zmin())
-        });
+        root.bbox = CGAL::Bbox_3(cx-half, cy-half, cz-half, cx+half, cy+half, cz+half);
 
-        root.bbox = CGAL::Bbox_3(cx - half, cy - half, cz - half,
-                                 cx + half, cy + half, cz + half);
-        root.depth = 0;
+        std::cout << "Step 1: Geometric Refinement (Concave)..." << std::endl;
+        Thesis::refine_cell(root, mesh_, tree_, face_normals);
 
-        // Run refinement
-        refine_cell(root, mesh_, tree_, face_normals);
+        // ---------------------- Balanced Octree ---------------------
+        std::cout << "Step 2: Balancing (2:1 Rule)..." << std::endl;
+        Thesis::balance_2to1(root, tree_);
 
-        // Collect using the new Bbox_3 vector type
-        std::vector<CGAL::Bbox_3> cubes2;
-        collect_intersecting_leaves_verified(root, tree_, cubes2);
+        std::vector<CGAL::Bbox_3> final_cubes;
+        Thesis::collect_leaves_as_bboxes(root, final_cubes, true); // true = only those intersecting mesh
 
-        std::cout << "Leaf cells: " << cubes2.size() << std::endl;
-        // Write wireframe
-        Thesis::write_off_wireframe(cubes2, "../data/Output/3DBAG_Buildings/Octree_refinement.off");
+        std::cout << "Final Leaf Count: " << final_cubes.size() << std::endl;
+        Thesis::write_off_wireframe(final_cubes, "../data/Output/3DBAG_Buildings/Octree_balanced.off");
 
-        // Pass to Alpha Wrap
-        // std::cout << "..........Running Octree alpha wrap algorithm.........." << std::endl;
-        // CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::octree(cubes2));
+        // ---------------------- Only Max depth ---------------------
+        std::vector<CGAL::Bbox_3> finest_cubes;
+        int max_d = 9;
 
+        // Collect only the finest detail cells
+        Thesis::collect_leaves_at_max_depth(root, max_d, finest_cubes, true);
+
+        std::cout << "Collected " << finest_cubes.size() << " cells at depth " << max_d << std::endl;
+        Thesis::write_off_wireframe(finest_cubes, "../data/Output/3DBAG_Buildings/Octree_finest.off");
+
+        std::cout << "Step 3: Running Alpha Wrap with Octree..." << std::endl;
+        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::octree(finest_cubes));
     }
     if ((!Octree && !MAT) || (Octree && MAT)) {
         // Default: call alpha_wrap_3 without MAT or Octree
         std::cout << "..........Running normal alpha wrap algorithm.........." << std::endl;
-        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap);
+        // CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap);
     }
 
     t.stop();
