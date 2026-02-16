@@ -20,10 +20,15 @@ namespace CGAL {
 
                 Tree m_tree;
                 bool m_has_data;
+                double m_finest_edge_length;
 
             public:
-                Octree_refinement_depth(const std::vector<Bbox_3>& finest_cubes) : m_has_data(false) {
+                Octree_refinement_depth(const std::vector<Bbox_3>& finest_cubes)
+                    : m_has_data(false), m_finest_edge_length(0.0) {
                     if (!finest_cubes.empty()) {
+                        // Calculate edge length once from the first cube
+                        m_finest_edge_length = finest_cubes[0].xmax() - finest_cubes[0].xmin();
+
                         for(const auto& b : finest_cubes) {
                             m_tree.insert(Point_3((b.xmin()+b.xmax())/2.0,
                                                   (b.ymin()+b.ymax())/2.0,
@@ -33,6 +38,8 @@ namespace CGAL {
                         m_has_data = true;
                     }
                 }
+
+                double finest_edge_length() const { return m_finest_edge_length; }
 
                 double squared_dist_to_finest(const Point_3& p) const {
                     if (!m_has_data) return (std::numeric_limits<double>::max)();
