@@ -61,7 +61,7 @@ int main(int argc, char** argv)
     std::cout << "------------------------------------------------------------" << std::endl;
   std::cout << "Reading input: " << filename << std::endl;
 
-  const double relative_alpha = 200; //2000. //20. //1000.
+  const double relative_alpha = 100; //2000. //20. //1000.
   const double relative_offset = 12000.; // 7000. //600. //12000.
 
     // ----------------------MESH INPUT FILE (optional: compute normals and tree)------------------

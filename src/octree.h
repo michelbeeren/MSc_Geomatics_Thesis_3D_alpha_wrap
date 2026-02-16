@@ -61,6 +61,7 @@ struct CellKeyHash {
 };
 
 using LeafMap = std::unordered_map<CellKey, OctreeCell*, CellKeyHash>;
+OctreeCell* find_leaf_neighbor_any_depth(const LeafMap& map, int depth, int nx, int ny, int nz);
 
 // Core Functions
 void collect_faces(OctreeCell& cell, const Tree& tree);

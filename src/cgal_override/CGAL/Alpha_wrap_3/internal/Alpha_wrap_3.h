@@ -31,7 +31,9 @@
 
 #include <CGAL/license/Alpha_wrap_3.h>
 #include <CGAL/Alpha_wrap_3/internal/Feature_size_MAT.h>
-#include <CGAL/Alpha_wrap_3/internal/Octree_refinement_depth.h>
+// #include <CGAL/Alpha_wrap_3/internal/Octree_refinement_depth.h>
+#include <CGAL/Alpha_wrap_3/internal/is_concave.h>
+#include "../../../../octree.h"
 
 #include <CGAL/Alpha_wrap_3/internal/Alpha_wrap_triangulation_cell_base_3.h>
 #include <CGAL/Alpha_wrap_3/internal/Alpha_wrap_triangulation_vertex_base_3.h>
@@ -290,35 +292,48 @@ public:
 
   void set_octree(const std::vector<CGAL::Bbox_3>& cells)
   {
-    m_cells = cells;
+    m_cells = cells; // Store the Bboxes (these should be your depth-9 cubes)
     m_use_octree = !m_cells.empty();
 
     if (m_use_octree) {
-      // 1. Find the largest side length to determine "root" scale
-      double max_side = 0.0;
-      for (const auto& bbox : m_cells) {
-        max_side = (std::max)({max_side, bbox.xmax()-bbox.xmin(), bbox.ymax()-bbox.ymin(), bbox.zmax()-bbox.zmin()});
-      }
-
-      std::vector<Thesis::OctreeCell> octree_cells;
-      for (const auto& bbox : m_cells) {
-        octree_cells.emplace_back();
-        octree_cells.back().bbox = bbox;
-
-        // 2. Calculate depth: depth = log2(root_side / current_side)
-        double current_side = bbox.xmax() - bbox.xmin();
-        if (current_side > 0) {
-          octree_cells.back().depth = static_cast<int>(std::round(std::log2(max_side / current_side)));
-        } else {
-          octree_cells.back().depth = 0;
-        }
-      }
-
-      m_octree_ptr = std::make_unique<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>>(std::move(octree_cells));
+      // Pass the vector of Bboxes directly to your new Kd-tree based class
+      m_octree_ptr = std::make_unique<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>>(m_cells);
     } else {
       m_octree_ptr.reset();
     }
   }
+
+  // void set_octree2(const std::vector<CGAL::Bbox_3>& cells)
+  // {
+  //   m_cells = cells;
+  //   m_use_octree = !m_cells.empty();
+  //
+  //   if (m_use_octree) {
+  //     // 1. Find the largest side length to determine "root" scale
+  //     double max_side = 0.0;
+  //     for (const auto& bbox : m_cells) {
+  //       max_side = (std::max)({max_side, bbox.xmax()-bbox.xmin(), bbox.ymax()-bbox.ymin(), bbox.zmax()-bbox.zmin()});
+  //     }
+  //
+  //     std::vector<Thesis::OctreeCell> octree_cells;
+  //     for (const auto& bbox : m_cells) {
+  //       octree_cells.emplace_back();
+  //       octree_cells.back().bbox = bbox;
+  //
+  //       // 2. Calculate depth: depth = log2(root_side / current_side)
+  //       double current_side = bbox.xmax() - bbox.xmin();
+  //       if (current_side > 0) {
+  //         octree_cells.back().depth = static_cast<int>(std::round(std::log2(max_side / current_side)));
+  //       } else {
+  //         octree_cells.back().depth = 0;
+  //       }
+  //     }
+  //
+  //     m_octree_ptr = std::make_unique<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>>(std::move(octree_cells));
+  //   } else {
+  //     m_octree_ptr.reset();
+  //   }
+  // }
 
 
 
@@ -1045,25 +1060,38 @@ bool is_traversable(const Facet& f) const
             (p0.z() + p1.z() + p2.z()) / 3.0
         );
       // std::cout << "f_mid: " << f_mid.x() << ", " << f_mid.y() << ", " << f_mid.z() << std::endl;
+      double alpha_val = CGAL::to_double(m_alpha);
+      double local_alpha = alpha_val;
 
+      // 1. Get squared distance to nearest depth-9 cube center
+      double sq_dist = m_octree_ptr->squared_dist_to_finest(f_mid);
 
-        // Calculate the refinement depth based on the Octree
-        const double fs = m_octree_ptr->nearest_refinement_depth(f_mid); // Use octree refinement depth
-      // 1. Parameters
-      const double alpha_val = CGAL::to_double(m_alpha);
-      const double scaler = 6.0;
-      const double max_ref = 7.0;
+      // 2. Threshold: If the triangle center is within 'alpha' of a finest cube
+      // we assume it's a sharp concave feature and tighten the wrap.
+      if (sq_dist < (alpha_val * alpha_val)) {
+        local_alpha = 0.1 * alpha_val;
+      }
 
-      const double a_ = (0.2*alpha_val*(1-scaler))/max_ref;
-      const double b_ = 0.2*scaler*alpha_val;
+      const FT local_sq_alpha = FT(local_alpha * local_alpha);
+      return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
 
-      // double local_alpha = a_*fs + b_;
-      double local_alpha = 0.3*alpha_val;
-
-      std::cout << "fs: " << fs << " | local_alpha: " << local_alpha << " vs alpha " << m_alpha << std::endl;
-        const FT local_sq_alpha = FT(local_alpha * local_alpha);
-
-        return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
+      //   // Calculate the refinement depth based on the Octree
+      //   const double fs = m_octree_ptr->nearest_refinement_depth(f_mid); // Use octree refinement depth
+      // // 1. Parameters
+      // const double alpha_val = CGAL::to_double(m_alpha);
+      // const double scaler = 6.0;
+      // const double max_ref = 7.0;
+      //
+      // const double a_ = (0.2*alpha_val*(1-scaler))/max_ref;
+      // const double b_ = 0.2*scaler*alpha_val;
+      //
+      // // double local_alpha = a_*fs + b_;
+      // double local_alpha = 0.3*alpha_val;
+      //
+      // std::cout << "fs: " << fs << " | local_alpha: " << local_alpha << " vs alpha " << m_alpha << std::endl;
+      //   const FT local_sq_alpha = FT(local_alpha * local_alpha);
+      //
+      //   return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
     }
 
     // D) Default case: if no MAT or Octree is provided, use the original logic.
