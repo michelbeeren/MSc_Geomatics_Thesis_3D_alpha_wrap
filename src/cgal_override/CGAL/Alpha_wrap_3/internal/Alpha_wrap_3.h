@@ -965,10 +965,58 @@ private:
 
 bool is_traversable(const Facet& f) const
 {
-    // A) Default CGAL behavior: when neither MAT nor Octree is used
-    if ((!m_use_mat || !m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr)) {
-        return less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
+  // A) Default CGAL behavior: when neither MAT nor Octree is used
+  if ((!m_use_mat || !m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr))
+  {
+    // ---- 1. Alpha condition (compute ONCE) ----
+    bool traversable =
+        less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
+
+    if (traversable) {
+      // std::cout << "face is traversible!" << std::endl;
+      return traversable;
     }
+    else {
+      // std::cout << "face is not traversible!" << std::endl;
+      // ---- 2. Compute face midpoint ----
+      const Cell_handle ch = f.first;
+      const int i = f.second;
+
+      const Point_3& p0 = ch->vertex((i + 1) & 3)->point();
+      const Point_3& p1 = ch->vertex((i + 2) & 3)->point();
+      const Point_3& p2 = ch->vertex((i + 3) & 3)->point();
+
+      const Point_3 f_mid(
+          (p0.x() + p1.x() + p2.x()) / 3.0,
+          (p0.y() + p1.y() + p2.y()) / 3.0,
+          (p0.z() + p1.z() + p2.z()) / 3.0
+      );
+
+      // ---- 3. Distance to input surface via Oracle ----
+      const Point_3 closest_pt = m_oracle.closest_point(f_mid);
+
+      const FT sq_d =
+          geom_traits().compute_squared_distance_3_object()(f_mid, closest_pt);
+
+      const double dist_input =
+          std::sqrt(CGAL::to_double(sq_d));
+
+      // ---- 4. Distance to offset surface (optional) ----
+      const double dist_offset =
+          dist_input - CGAL::to_double(m_offset);
+
+      const double tolerance = 1.2 * m_offset;
+
+      if (dist_input > tolerance) {
+        // std::cout << "tolerance = " << tolerance << std::endl;
+        // std::cout << "Distance midpoint -> input surface: "<< dist_input << std::endl;
+        // std::cout << "Distance midpoint -> offset surface: " << dist_offset << std::endl;
+        // std::cout << "Oof distance of triangle far from offset!" << std::endl;
+        return true;
+      }
+    }
+    return traversable;
+  }
 
     // B) MAT-based behavior: when MAT is used
     if ((m_use_mat || m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr)) {
