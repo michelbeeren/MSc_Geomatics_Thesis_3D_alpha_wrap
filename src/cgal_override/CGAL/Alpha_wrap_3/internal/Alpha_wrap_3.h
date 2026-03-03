@@ -1139,14 +1139,16 @@ bool is_traversable(const Facet& f) const
     {
       const Point_3& ch_cc = circumcenter(ch);
 
+      // std::cout << "ch_cc: " << ch_cc << std::endl;
+      // std::cout << "neighbor_cc: " << neighbor_cc << std::endl;
       // If the voronoi edge intersects the offset, the steiner point is the first intersection
-      if(m_oracle.first_intersection(ch_cc, neighbor_cc, steiner_point, m_offset))
-      {
-#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
-        std::cout << "Steiner found through first_intersection(): " << steiner_point << std::endl;
-#endif
-        return true;
-      }
+//       if(m_oracle.first_intersection(ch_cc, neighbor_cc, steiner_point, m_offset))
+//       {
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//         std::cout << "Steiner found through first_intersection(): " << steiner_point << std::endl;
+// #endif
+//         return true;
+//       }
     }
 
     Tetrahedron_with_outside_info<Geom_traits> tet(neighbor, geom_traits());
@@ -1155,8 +1157,9 @@ bool is_traversable(const Facet& f) const
       // steiner point is the closest point on input from cell centroid with offset
       const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
       CGAL_assertion(closest_pt != neighbor_cc);
+      const Point_3& ch_cc = circumcenter(ch);
 
-      Vector_3 unit = vector(closest_pt, neighbor_cc);
+      Vector_3 unit = vector(closest_pt, neighbor_cc); //       Vector_3 unit = vector(closest_pt, ch_cc); produces less points, but outpuit is invalid :(
 
       // PMP::internal::normalize() requires sqrt()
       unit = scale(unit, m_offset / approximate_sqrt(geom_traits().compute_squared_length_3_object()(unit)));
@@ -1177,6 +1180,94 @@ bool is_traversable(const Facet& f) const
 
     return false;
   }
+
+
+//   bool compute_steiner_point(const Cell_handle ch,
+//                              const Cell_handle neighbor,
+//                              Point_3& steiner_point) const
+//   {
+//     CGAL_precondition(!m_tr.is_infinite(neighbor));
+//
+//     typename Geom_traits::Construct_ball_3 ball = geom_traits().construct_ball_3_object();
+//     typename Geom_traits::Construct_vector_3 vector = geom_traits().construct_vector_3_object();
+//     typename Geom_traits::Construct_translated_point_3 translate = geom_traits().construct_translated_point_3_object();
+//     typename Geom_traits::Construct_scaled_vector_3 scale = geom_traits().construct_scaled_vector_3_object();
+//
+//     const Point_3& neighbor_cc = circumcenter(neighbor);
+//     const Ball_3 neighbor_cc_offset_ball = ball(neighbor_cc, m_sq_offset);
+//     const bool is_neighbor_cc_in_offset = m_oracle.do_intersect(neighbor_cc_offset_ball);
+//
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//     std::cout << "Compute_steiner_point(" << &*ch << ", " << &*neighbor << ")" << std::endl;
+//
+//     const Point_3& chc = circumcenter(ch);
+//     std::cout << "CH" << std::endl;
+//     std::cout << "\t" << ch->vertex(0)->point() << std::endl;
+//     std::cout << "\t" << ch->vertex(1)->point() << std::endl;
+//     std::cout << "\t" << ch->vertex(2)->point() << std::endl;
+//     std::cout << "\t" << ch->vertex(3)->point() << std::endl;
+//     std::cout << "cc: " << chc << std::endl;
+//     std::cout << "CC Distance to input: " << CGAL::squared_distance(chc, m_oracle.closest_point(chc)) << std::endl;
+//
+//     std::cout << "NCH" << std::endl;
+//     std::cout << "\t" << neighbor->vertex(0)->point() << std::endl;
+//     std::cout << "\t" << neighbor->vertex(1)->point() << std::endl;
+//     std::cout << "\t" << neighbor->vertex(2)->point() << std::endl;
+//     std::cout << "\t" << neighbor->vertex(3)->point() << std::endl;
+//     std::cout << "ncc: " << neighbor_cc << std::endl;
+//     std::cout << "NC Distance to input: " << CGAL::squared_distance(neighbor_cc, m_oracle.closest_point(neighbor_cc)) << std::endl;
+//     std::cout << "is_neighbor_cc_in_offset = " << is_neighbor_cc_in_offset << std::endl;
+//
+//     std::cout << "squared offset " << m_sq_offset << std::endl;
+// #endif
+//
+//     // ch's circumcenter should not be within the offset volume
+//     CGAL_assertion_code(const Point_3& ch_cc = circumcenter(ch);)
+//     CGAL_assertion_code(const Ball_3 ch_cc_offset_ball = ball(ch_cc, m_sq_offset);)
+//     CGAL_assertion(!m_oracle.do_intersect(ch_cc_offset_ball));
+//
+//     if(is_neighbor_cc_in_offset)
+//     {
+//       const Point_3& ch_cc = circumcenter(ch);
+//
+//       // If the voronoi edge intersects the offset, the steiner point is the first intersection
+//       if(m_oracle.first_intersection(ch_cc, neighbor_cc, steiner_point, m_offset))
+//       {
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//         std::cout << "Steiner found through first_intersection(): " << steiner_point << std::endl;
+// #endif
+//         return true;
+//       }
+//     }
+//
+//     Tetrahedron_with_outside_info<Geom_traits> tet(neighbor, geom_traits());
+//     if(m_oracle.do_intersect(tet))
+//     {
+//       // steiner point is the closest point on input from cell centroid with offset
+//       const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
+//       CGAL_assertion(closest_pt != neighbor_cc);
+//
+//       Vector_3 unit = vector(closest_pt, neighbor_cc);
+//
+//       // PMP::internal::normalize() requires sqrt()
+//       unit = scale(unit, m_offset / approximate_sqrt(geom_traits().compute_squared_length_3_object()(unit)));
+//       steiner_point = translate(closest_pt, unit);
+//
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//       std::cout << "Steiner found through neighboring tet intersecting the input: " << steiner_point << std::endl;
+//       std::cout << "Closest point: " << closest_pt << std::endl;
+//       std::cout << "Direction: " << vector(closest_pt, neighbor_cc) << std::endl;
+// #endif
+//
+//       return true;
+//     }
+//
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//     std::cout << "No Steiner point" << std::endl;
+// #endif
+//
+//     return false;
+//   }
 
 private:
   // A permissive gate is a gate that we can traverse without checking its circumradius

@@ -41,6 +41,7 @@ using Ray_3   = K::Ray_3;
 #include "val3dity.h"
 #include "MAT.h"
 #include "octree.h"
+#include "hausdorff.h"
 
 std::map<Mesh::Face_index, std::set<Mesh::Face_index>> create_adjacency_map(const Mesh& mesh) {
     std::map<Mesh::Face_index, std::set<Mesh::Face_index>> adjacency_map;
@@ -165,7 +166,7 @@ std::string generate_output_name(const std::string input_name_, const double rel
 }
 
 // 3D alpha wrap
-Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool MAT, bool Octree, bool write_out_, bool validate) {
+Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool MAT, bool Octree, bool write_out_, bool validate, bool hausdorff) {
     // get mesh from input data
     Mesh& mesh_ = data_.mesh;
 
@@ -270,9 +271,9 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
     std::cout << "🎁 Successfully alpha wrapped! 🎁: " << num_vertices(wrap) << " 🔘vertices🔘, "
               << num_faces(wrap) << " 📐faces📐, it took " << t.time() << " s.⏰" << std::endl;
 
+    std::string output_ = generate_output_name(filename, relative_alpha_, relative_offset_);
     // Write the output mesh
     if (write_out_) {
-        std::string output_ = generate_output_name(filename, relative_alpha_, relative_offset_);
         std::filesystem::path p(output_);
         std::filesystem::create_directory(p.parent_path());
         if (MAT && !Octree) {
@@ -296,6 +297,13 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         valid_mesh_boolean(wrap);
     }
     std::cout << "---------------------------------------------------------------" << std::endl;
+
+    // ----------------------------- write HausDorff distance --------------------------
+    if (hausdorff) {
+        std::cout << "Measuring Hausdorff..... " << std::endl;
+        hausdorff_distance(wrap, mesh_, 128);  // Apply color based on Hausdorff distance
+        write_hausdorff_distance(wrap, output_);  // Now save to PLY
+    }
 
     return wrap;
 }

@@ -24,6 +24,8 @@ add_executable(alpha_wrap
         src/octree.h
         src/MAT.cpp
         src/MAT.h
+        src/hausdorff.cpp
+        src/hausdorff.h
 )
 
 # EXTRA HARD FORCE: put -Ioverride explicitly at the start of compile flags --> probably not necessary

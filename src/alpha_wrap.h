@@ -14,7 +14,7 @@ struct MeshData {
 
 // struct LeafCell {CGAL::Bbox_3 bbox;};
 
-Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool MAT, bool Octree, bool write_out_, bool validate);
+Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool MAT, bool Octree, bool write_out_, bool validate, bool hausdorff);
 double rel_offset_to_offset(Mesh& mesh, const double relative_offset);
 Mesh _3D_alpha_inside_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, Mesh& mesh_, bool write_out_, bool validate);
 MeshData mesh_input(const std::string& filename, bool compute_normals = true, bool build_tree = true);
