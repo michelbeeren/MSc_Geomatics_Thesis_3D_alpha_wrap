@@ -57,12 +57,12 @@ using Tree        = CGAL::AABB_tree<AABB_traits>;
 int main(int argc, char** argv)
 {
   // Read the input
-  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Input/3DBAG_Buildings/bouwkunde.off");
+  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Input/3DBAG_Buildings/joep_huis.off");
     std::cout << "------------------------------------------------------------" << std::endl;
   std::cout << "Reading input: " << filename << std::endl;
 
   const double relative_alpha = 20; //2000. //20. //1000.
-  const double relative_offset = 10000.; // 7000. //600. //12000.
+  const double relative_offset = 1000.; // 7000. //600. //12000.
 
     // ----------------------MESH INPUT FILE (optional: compute normals and tree)------------------
     auto data = mesh_input(filename, true, true); // set both to false if you do not want to compute normals + tree
@@ -76,7 +76,7 @@ int main(int argc, char** argv)
 
 
     // ------------------------------ALPHA WRAP INPUT---------------------------------------
-    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, data, false, false, true, true, true); // set both to false if you do not want to write out the file and test if valid
+    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, data, false, false, true, true, false); // set both to false if you do not want to write out the file and test if valid
     // -------------------------- alpha wrap from inside -----------------------------------
     // Mesh alpha_inside_wrap = _3D_alpha_inside_wrap( filename,relative_alpha,relative_offset, mesh, true, false);
 
