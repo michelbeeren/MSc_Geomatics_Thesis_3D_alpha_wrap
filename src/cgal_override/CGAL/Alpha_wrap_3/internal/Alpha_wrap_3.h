@@ -1182,7 +1182,204 @@ bool is_traversable(const Facet& f) const
 //     return false;
 //   }
 
-    bool compute_steiner_point(const Cell_handle ch,
+//     bool compute_steiner_point(const Cell_handle ch,
+//                              const Cell_handle neighbor,
+//                              Point_3& steiner_point) const
+//   {
+//     CGAL_precondition(!m_tr.is_infinite(neighbor));
+//
+//     typename Geom_traits::Construct_ball_3 ball = geom_traits().construct_ball_3_object();
+//     typename Geom_traits::Construct_vector_3 vector = geom_traits().construct_vector_3_object();
+//     typename Geom_traits::Construct_translated_point_3 translate = geom_traits().construct_translated_point_3_object();
+//     typename Geom_traits::Construct_scaled_vector_3 scale = geom_traits().construct_scaled_vector_3_object();
+//     typename Geom_traits::Compute_squared_length_3 sq_length = geom_traits().compute_squared_length_3_object();
+//     typename Geom_traits::Compute_scalar_product_3 dot = geom_traits().compute_scalar_product_3_object();
+//
+//     const Point_3& neighbor_cc = circumcenter(neighbor);
+//     const Ball_3 neighbor_cc_offset_ball = ball(neighbor_cc, m_sq_offset);
+//     const bool is_neighbor_cc_in_offset = m_oracle.do_intersect(neighbor_cc_offset_ball);
+//
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//     std::cout << "Compute_steiner_point(" << &*ch << ", " << &*neighbor << ")" << std::endl;
+//
+//     const Point_3& chc = circumcenter(ch);
+//     std::cout << "CH" << std::endl;
+//     std::cout << "\t" << ch->vertex(0)->point() << std::endl;
+//     std::cout << "\t" << ch->vertex(1)->point() << std::endl;
+//     std::cout << "\t" << ch->vertex(2)->point() << std::endl;
+//     std::cout << "\t" << ch->vertex(3)->point() << std::endl;
+//     std::cout << "cc: " << chc << std::endl;
+//     std::cout << "CC Distance to input: " << CGAL::squared_distance(chc, m_oracle.closest_point(chc)) << std::endl;
+//
+//     std::cout << "NCH" << std::endl;
+//     std::cout << "\t" << neighbor->vertex(0)->point() << std::endl;
+//     std::cout << "\t" << neighbor->vertex(1)->point() << std::endl;
+//     std::cout << "\t" << neighbor->vertex(2)->point() << std::endl;
+//     std::cout << "\t" << neighbor->vertex(3)->point() << std::endl;
+//     std::cout << "ncc: " << neighbor_cc << std::endl;
+//     std::cout << "NC Distance to input: " << CGAL::squared_distance(neighbor_cc, m_oracle.closest_point(neighbor_cc)) << std::endl;
+//     std::cout << "is_neighbor_cc_in_offset = " << is_neighbor_cc_in_offset << std::endl;
+//
+//     std::cout << "squared offset " << m_sq_offset << std::endl;
+// #endif
+//
+//     // ch's circumcenter should not be within the offset volume
+//     CGAL_assertion_code(const Point_3& ch_cc = circumcenter(ch);)
+//     CGAL_assertion_code(const Ball_3 ch_cc_offset_ball = ball(ch_cc, m_sq_offset);)
+//     CGAL_assertion(!m_oracle.do_intersect(ch_cc_offset_ball));
+//
+//     if(is_neighbor_cc_in_offset)
+//     {
+//       const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
+//       CGAL_assertion(closest_pt != neighbor_cc);
+//       const Point_3& ch_cc = circumcenter(ch);
+//       Point_3 pt1, pt2, pt3;
+//       int fi = ch->index(neighbor);
+//       int k = 0;
+//
+//       for(int j = 0; j < 4; ++j)
+//       {
+//         if(j != fi)
+//         {
+//           const Point_3& p = ch->vertex(j)->point();
+//           if(k == 0) pt1 = p;
+//           else if(k == 1) pt2 = p;
+//           else pt3 = p;
+//           ++k;
+//         }
+//       }
+//
+//       const Point_3 closest_pt1 = m_oracle.closest_point(pt1);
+//       const Point_3 closest_pt2 = m_oracle.closest_point(pt2);
+//       const Point_3 closest_pt3 = m_oracle.closest_point(pt3);
+//       Vector_3 v1 = vector(closest_pt1, pt1);
+//       Vector_3 v2 = vector(closest_pt2, pt2);
+//       Vector_3 v3 = vector(closest_pt3, pt3);
+//       v1 = scale(v1, FT(1) / approximate_sqrt(sq_length(v1)));
+//       v2 = scale(v2, FT(1) / approximate_sqrt(sq_length(v2)));
+//       v3 = scale(v3, FT(1) / approximate_sqrt(sq_length(v3)));
+//       std::cout << "=======================================" << std::endl;
+//       std::cout << "v1 = " << v1 << std::endl;
+//       std::cout << "v2 = " << v2 << std::endl;
+//       std::cout << "v3 = " << v3 << std::endl;
+//       Vector_3 offset_dir;
+//
+//       FT d12 = dot(v1, v2);
+//       FT d13 = dot(v1, v3);
+//       FT d23 = dot(v2, v3);
+//
+//       // helper lambdas
+//       const FT same_threshold = FT(0.98);
+//       auto same_dir = [&](const Vector_3& a, const Vector_3& b) -> bool {
+//         return dot(a, b) > same_threshold;
+//       };
+//
+//       auto normalize = [&](Vector_3 u) -> Vector_3 {
+//         const FT len2 = sq_length(u);
+//         CGAL_assertion(len2 > FT(0));
+//         return scale(u, FT(1) / approximate_sqrt(len2));
+//       };
+//
+//       // classify
+//       const bool v12_same = same_dir(v1, v2);
+//       const bool v13_same = same_dir(v1, v3);
+//       const bool v23_same = same_dir(v2, v3);
+//       Vector_3 vc, vd;
+//
+//       if (v12_same && v13_same && v23_same)
+//       {
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//         std::cout << "all vectors are the same😯" << std::endl;
+// #endif
+//         // Move from closest_pt in direction v1 by offset length
+//         steiner_point = translate(closest_pt, scale(v1, m_offset));
+//         return true;
+//       }
+//       else if(!v12_same && !v13_same && !v23_same)
+//       {
+//         if(m_oracle.first_intersection(ch_cc, neighbor_cc, steiner_point, m_offset))
+//         {
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//           std::cout << "Steiner found through first_intersection(): " << steiner_point << std::endl;
+// #endif
+//           return true;
+//         }
+//       }
+//         // "two vectors are the same" branch (your requested behavior)
+//         // Find the repeated direction vc and the different one vd
+//
+//         else if (v12_same && !v13_same)      { vc = v1; vd = v3; }
+//         else if (v13_same && !v12_same) { vc = v1; vd = v2; }
+//         else if (v23_same && !v12_same) { vc = v2; vd = v1; }
+//         else
+//         {
+//           // If it's "all different" (or ambiguous), fall back to average direction of all three.
+//           // (You can replace this with your own desired behavior.)
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//           std::cout << "all vectors are different/ambiguous -> fallback average" << std::endl;
+// #endif
+//           Vector_3 avg3 = normalize(v1 + v2 + v3);
+//           steiner_point = translate(closest_pt, scale(avg3, m_offset));
+//           return true;
+//         }
+//       //       if(m_oracle.first_intersection(ch_cc, closest_pt, steiner_point, m_offset))
+//       //       {
+//       // #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//       //         std::cout << "Steiner found through first_intersection(): " << steiner_point << std::endl;
+//       // #endif
+//       //         return true;
+//       //       }
+//       std::cout << "offset_dir = " << offset_dir << std::endl;
+//       offset_dir = scale(offset_dir, FT(1) / approximate_sqrt(sq_length(offset_dir)));
+//       std::cout << "unit length offset_dir = " << offset_dir << std::endl;
+//       const Point_3 end_pt = translate(closest_pt, scale(offset_dir, 2*m_offset));
+//       if(m_oracle.first_intersection(closest_pt, end_pt, steiner_point, m_offset)) {
+//         std::cout << "omg steiner point constructed inside concave edge!" << std::endl;
+//         return true;
+//       }
+//       // const Point_3& ch_cc = circumcenter(ch);
+//
+//       // If the voronoi edge intersects the offset, the steiner point is the first intersection
+//       if(m_oracle.first_intersection(ch_cc, neighbor_cc, steiner_point, m_offset))
+//       {
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//         std::cout << "Steiner found through first_intersection(): " << steiner_point << std::endl;
+// #endif
+//         return true;
+//       }
+//     }
+//
+//     Tetrahedron_with_outside_info<Geom_traits> tet(neighbor, geom_traits());
+//     if(m_oracle.do_intersect(tet))
+//     {
+//       // steiner point is the closest point on input from cell centroid with offset
+//       const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
+//       CGAL_assertion(closest_pt != neighbor_cc);
+//       // const Ball_3 closest_pt_offset_ball = ball(neighbor_cc, m_sq_offset*1.1);
+//
+//       Vector_3 unit = vector(closest_pt, neighbor_cc);
+//
+//       // PMP::internal::normalize() requires sqrt()
+//       unit = scale(unit, m_offset / approximate_sqrt(geom_traits().compute_squared_length_3_object()(unit)));
+//       steiner_point = translate(closest_pt, unit);
+//
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//       std::cout << "Steiner found through neighboring tet intersecting the input: " << steiner_point << std::endl;
+//       std::cout << "Closest point: " << closest_pt << std::endl;
+//       std::cout << "Direction: " << vector(closest_pt, neighbor_cc) << std::endl;
+// #endif
+//
+//       return true;
+//     }
+//
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//     std::cout << "No Steiner point" << std::endl;
+// #endif
+//
+//     return false;
+//   }
+
+    bool compute_steiner_point3(const Cell_handle ch,
                              const Cell_handle neighbor,
                              Point_3& steiner_point) const
   {
@@ -1230,8 +1427,6 @@ bool is_traversable(const Facet& f) const
 
     if(is_neighbor_cc_in_offset)
     {
-      const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
-      CGAL_assertion(closest_pt != neighbor_cc);
       const Point_3& ch_cc = circumcenter(ch);
       Point_3 pt1, pt2, pt3;
       int fi = ch->index(neighbor);
@@ -1248,73 +1443,301 @@ bool is_traversable(const Facet& f) const
           ++k;
         }
       }
+      Facet f = Facet(ch, fi);
+      bool traversable = less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
+      std::cout << "Checking traversable: " << traversable << std::endl; // Debug line before the condition
 
-      const Point_3 closest_pt1 = m_oracle.closest_point(pt1);
-      const Point_3 closest_pt2 = m_oracle.closest_point(pt2);
-      const Point_3 closest_pt3 = m_oracle.closest_point(pt3);
-      Vector_3 v1 = vector(closest_pt1, pt1);
-      Vector_3 v2 = vector(closest_pt2, pt2);
-      Vector_3 v3 = vector(closest_pt3, pt3);
-      v1 = scale(v1, FT(1) / approximate_sqrt(sq_length(v1)));
-      v2 = scale(v2, FT(1) / approximate_sqrt(sq_length(v2)));
-      v3 = scale(v3, FT(1) / approximate_sqrt(sq_length(v3)));
-      std::cout << "=======================================" << std::endl;
-      std::cout << "v1 = " << v1 << std::endl;
-      std::cout << "v2 = " << v2 << std::endl;
-      std::cout << "v3 = " << v3 << std::endl;
-      Vector_3 offset_dir;
+      if (!traversable) {
+        std::cout << "🤮🤮🤮!!!!!!face is not traversible!!!!!!🤮🤮🤮" << std::endl;
 
-      FT d12 = dot(v1, v2);
-      FT d13 = dot(v1, v3);
-      FT d23 = dot(v2, v3);
 
-      const FT threshold = FT(0.98);
+        const Point_3 closest_pt1 = m_oracle.closest_point(pt1);
+        const Point_3 closest_pt2 = m_oracle.closest_point(pt2);
+        const Point_3 closest_pt3 = m_oracle.closest_point(pt3);
+        Vector_3 v1 = vector(closest_pt1, pt1);
+        Vector_3 v2 = vector(closest_pt2, pt2);
+        Vector_3 v3 = vector(closest_pt3, pt3);
+        v1 = scale(v1, FT(1) / approximate_sqrt(sq_length(v1)));
+        v2 = scale(v2, FT(1) / approximate_sqrt(sq_length(v2)));
+        v3 = scale(v3, FT(1) / approximate_sqrt(sq_length(v3)));
+        // std::cout << "=======================================" << std::endl;
+        // std::cout << "v1 = " << v1 << std::endl;
+        // std::cout << "v2 = " << v2 << std::endl;
+        // std::cout << "v3 = " << v3 << std::endl;
+        Vector_3 offset_dir;
 
-      bool v12_same = d12 > threshold;
-      bool v13_same = d13 > threshold;
-      bool v23_same = d23 > threshold;
+        FT d12 = dot(v1, v2);
+        FT d13 = dot(v1, v3);
+        FT d23 = dot(v2, v3);
 
-      if(v12_same && v13_same && v23_same)
-      {
-        std::cout << "all vectors are the same😯" << std::endl;
-        offset_dir = v1;
+        // helper lambdas
+        const FT same_threshold = FT(0.95);
+        auto same_dir = [&](const Vector_3& a, const Vector_3& b) -> bool {
+          return dot(a, b) > same_threshold;
+        };
+
+        auto normalize = [&](Vector_3 u) -> Vector_3 {
+          const FT len2 = sq_length(u);
+          CGAL_assertion(len2 > FT(0));
+          return scale(u, FT(1) / approximate_sqrt(len2));
+        };
+
+        // classify
+        const bool v12_same = same_dir(v1, v2);
+        const bool v13_same = same_dir(v1, v3);
+        const bool v23_same = same_dir(v2, v3);
+        Vector_3 vc(0, 0, 0);  // Initialize to zero vector
+        Vector_3 vd(0, 0, 0);  // Initialize to zero vector
+        Point_3 pc,pd;
+        if (v12_same && !v13_same) {
+          vc = v1;
+          pc = closest_pt1;
+          vd = v3;
+          pd = closest_pt3;
+        }
+        if (v13_same && !v23_same) {
+          vc = v1;
+          pc = closest_pt1;
+          vd = v2;
+          pd = closest_pt2;
+        }
+        if (v23_same && !v12_same) {
+          vc = v2;
+          pc = closest_pt2;
+          vd = v1;
+          pd = closest_pt1;
+        }
+        const FT epsilon = FT(1e-10);  // Small threshold to account for floating-point precision
+
+        // Function to check if a vector is non-zero
+        auto is_non_zero = [&](const Vector_3& v) -> bool {
+          return sq_length(v) > epsilon;  // Check if the squared length is greater than epsilon
+        };
+        if (is_non_zero(vc) && is_non_zero(vd)) {
+          // std::cout << "✈️plane✈️ 1 = " << vc << std::endl;
+          // std::cout << "✈️plane✈️ 2 = " << vd << std::endl;
+          Vector_3 intersection_direction(
+            vc.y() * vd.z() - vc.z() * vd.y(),  // x component
+            vc.z() * vd.x() - vc.x() * vd.z(),  // y component
+            vc.x() * vd.y() - vc.y() * vd.x()   // z component
+          );
+          // planes should not be parrallel
+          if (sq_length(intersection_direction) > FT(1e-10)) {
+            // std::cout << "intersection direction = " << intersection_direction << std::endl;
+            Vector_3 vec_to_neighbor = vector(pc, ch_cc);
+            FT t = dot(vec_to_neighbor, intersection_direction) / dot(intersection_direction, intersection_direction);
+            Point_3 closest_point_on_line = pc + t * intersection_direction;
+            // std::cout << "closest_point on_line = " << closest_point_on_line << ", with neighbor_cc = " << neighbor_cc << std::endl;
+            if(m_oracle.first_intersection(closest_point_on_line, neighbor_cc, steiner_point, m_offset))
+            {
+              // std::cout << "steiner point = " << steiner_point << std::endl;
+              // std::cout << "🤩steiner point found from closesest point on line --> neighbor_cc🤩" << std::endl;
+              return true;
+            }
+            if(m_oracle.first_intersection(ch_cc, closest_point_on_line, steiner_point, m_offset))
+            {
+              // std::cout << "steiner point = " << steiner_point << std::endl;
+              // std::cout << "🥰steiner point found from ch_cc --> closesest point on line🥰" << std::endl;
+              return true;
+            }
+          }
+        }
       }
-      else if(!v12_same && !v13_same && !v23_same)
+
+      // If the voronoi edge intersects the offset, the steiner point is the first intersection
+      if(m_oracle.first_intersection(ch_cc, neighbor_cc, steiner_point, m_offset))
       {
-        std::cout << "all vectors are different!🥶" << std::endl;
-        offset_dir = (v1 + v2 + v3) / 3;
-      }
-      else if(v12_same)
-      {
-        std::cout << "two vectors are the same!🤯" << std::endl;
-        offset_dir = (v1 + v2) / 2;
-      }
-      else if(v13_same)
-      {
-        std::cout << "two vectors are the same!🤯" << std::endl;
-        offset_dir = (v1 + v3) / 2;
-      }
-      else
-      {
-        std::cout << "two vectors are the same!🤯" << std::endl;
-        offset_dir = (v2 + v3) / 2;
-      }
-      //       if(m_oracle.first_intersection(ch_cc, closest_pt, steiner_point, m_offset))
-      //       {
-      // #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
-      //         std::cout << "Steiner found through first_intersection(): " << steiner_point << std::endl;
-      // #endif
-      //         return true;
-      //       }
-      std::cout << "offset_dir = " << offset_dir << std::endl;
-      offset_dir = scale(offset_dir, FT(1) / approximate_sqrt(sq_length(offset_dir)));
-      std::cout << "unit length offset_dir = " << offset_dir << std::endl;
-      const Point_3 end_pt = translate(closest_pt, scale(offset_dir, 2*m_offset));
-      if(m_oracle.first_intersection(closest_pt, end_pt, steiner_point, m_offset)) {
-        std::cout << "omg steiner point constructed inside concave edge!" << std::endl;
+        // std::cout << "steiner point = " << steiner_point << std::endl;
+        // std::cout << "🧠steiner point made with first intersection with offset of voronoi edge🧠" << std::endl;
+#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+        std::cout << "Steiner found through first_intersection(): " << steiner_point << std::endl;
+#endif
         return true;
       }
-      // const Point_3& ch_cc = circumcenter(ch);
+    }
+
+    Tetrahedron_with_outside_info<Geom_traits> tet(neighbor, geom_traits());
+    if(m_oracle.do_intersect(tet))
+    {
+      // steiner point is the closest point on input from cell centroid with offset
+      const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
+      CGAL_assertion(closest_pt != neighbor_cc);
+
+      Vector_3 unit = vector(closest_pt, neighbor_cc);
+
+      // PMP::internal::normalize() requires sqrt()
+      unit = scale(unit, m_offset / approximate_sqrt(geom_traits().compute_squared_length_3_object()(unit)));
+      steiner_point = translate(closest_pt, unit);
+      // std::cout << "=======================================" << std::endl;
+      // std::cout << "👀steiner point based on closest point to neighbor_cc👀" << std::endl;
+
+#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+      std::cout << "Steiner found through neighboring tet intersecting the input: " << steiner_point << std::endl;
+      std::cout << "Closest point: " << closest_pt << std::endl;
+      std::cout << "Direction: " << vector(closest_pt, neighbor_cc) << std::endl;
+#endif
+
+      return true;
+    }
+
+#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+    std::cout << "No Steiner point" << std::endl;
+#endif
+
+    return false;
+  }
+
+bool compute_steiner_point4(const Cell_handle ch,
+                           const Cell_handle neighbor,
+                           Point_3& steiner_point) const
+{
+  CGAL_precondition(!m_tr.is_infinite(neighbor));
+  typedef typename Geom_traits::FT FT;
+  typedef typename Geom_traits::Vector_3 Vector_3;
+  typedef typename Geom_traits::Plane_3 Plane_3;
+  typedef typename Geom_traits::Line_3 Line_3;
+
+  // --- 1. Traits and Setup ---
+  typename Geom_traits::Construct_vector_3 vector = geom_traits().construct_vector_3_object();
+  typename Geom_traits::Construct_translated_point_3 translate = geom_traits().construct_translated_point_3_object();
+  typename Geom_traits::Construct_scaled_vector_3 scale = geom_traits().construct_scaled_vector_3_object();
+  typename Geom_traits::Compute_squared_length_3 sq_length = geom_traits().compute_squared_length_3_object();
+  typename Geom_traits::Compute_scalar_product_3 dot = geom_traits().compute_scalar_product_3_object();
+  typename Geom_traits::Construct_plane_3 construct_plane = geom_traits().construct_plane_3_object();
+  typename Geom_traits::Construct_projected_point_3 project_pt = geom_traits().construct_projected_point_3_object();
+
+  const Point_3& ch_cc = circumcenter(ch);
+  const Point_3& neighbor_cc = circumcenter(neighbor);
+
+  Point_3 pts[3];
+  int fi = ch->index(neighbor);
+  for(int j=0, k=0; j<4; ++j) {
+    if(j != fi) pts[k++] = ch->vertex(j)->point();
+  }
+
+  // --- 2. Check Traversability ---
+  Facet f = Facet(ch, fi);
+  if (less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr)) {
+    return compute_steiner_point2(ch, neighbor, steiner_point);
+  }
+
+  // --- 3. Concave Edge Logic (Ray-casting toward intersection line) ---
+  const Point_3 cpts[3] = { m_oracle.closest_point(pts[0]),
+                            m_oracle.closest_point(pts[1]),
+                            m_oracle.closest_point(pts[2]) };
+
+  Vector_3 vs[3] = { vector(cpts[0], pts[0]),
+                     vector(cpts[1], pts[1]),
+                     vector(cpts[2], pts[2]) };
+
+  auto normalize = [&](Vector_3 v) {
+    FT len2 = sq_length(v);
+    return (len2 > 1e-16) ? scale(v, FT(1) / approximate_sqrt(len2)) : Vector_3(0,0,0);
+  };
+  Vector_3 n1 = normalize(vs[0]), n2 = normalize(vs[1]), n3 = normalize(vs[2]);
+
+  // Select the two normals that are most different (closest to orthogonal)
+  FT d12 = CGAL::abs(dot(n1, n2));
+  FT d13 = CGAL::abs(dot(n1, n3));
+  FT d23 = CGAL::abs(dot(n2, n3));
+
+  Plane_3 planeA, planeB;
+  bool planes_found = false;
+  const FT diff_limit = FT(0.999); // Ignore if normals are within ~2 degrees
+
+  if (d12 <= d13 && d12 <= d23 && d12 < diff_limit) {
+    planeA = construct_plane(pts[0], n1);
+    planeB = construct_plane(pts[1], n2);
+    planes_found = true;
+  } else if (d13 <= d12 && d13 <= d23 && d13 < diff_limit) {
+    planeA = construct_plane(pts[0], n1);
+    planeB = construct_plane(pts[2], n3);
+    planes_found = true;
+  } else if (d23 < diff_limit) {
+    planeA = construct_plane(pts[1], n2);
+    planeB = construct_plane(pts[2], n3);
+    planes_found = true;
+  }
+
+  if (planes_found) {
+    auto result = CGAL::intersection(planeA, planeB);
+    Line_3 intersect_line;
+    // Using CGAL::assign to avoid boost/std versioning issues
+    if (result && CGAL::assign(intersect_line, *result)) {
+
+      Point_3 intersection_point = project_pt(intersect_line, ch_cc);
+
+      // PERFORMANCE GUARD: Only ray-cast if the line is relatively close to the facet.
+      // If the line is extremely far, the planes are too parallel to be useful.
+      FT facet_size_sq = CGAL::squared_distance(pts[0], pts[1]);
+      if (CGAL::squared_distance(intersection_point, pts[0]) < 100.0 * facet_size_sq) {
+
+        // SEARCH 1: From ch_cc toward the intersection line
+        if (m_oracle.first_intersection(ch_cc, intersection_point, steiner_point, m_offset)) {
+          return true;
+        }
+
+        // SEARCH 2: From intersection line toward neighbor_cc
+        if (m_oracle.first_intersection(intersection_point, neighbor_cc, steiner_point, m_offset)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // --- 4. Fallback ---
+  // If no intersection was found on the segments, use the standard logic.
+  return compute_steiner_point2(ch, neighbor, steiner_point);
+}
+
+  // normal steiner computation
+  bool compute_steiner_point2(const Cell_handle ch,
+                             const Cell_handle neighbor,
+                             Point_3& steiner_point) const
+  {
+    CGAL_precondition(!m_tr.is_infinite(neighbor));
+
+    typename Geom_traits::Construct_ball_3 ball = geom_traits().construct_ball_3_object();
+    typename Geom_traits::Construct_vector_3 vector = geom_traits().construct_vector_3_object();
+    typename Geom_traits::Construct_translated_point_3 translate = geom_traits().construct_translated_point_3_object();
+    typename Geom_traits::Construct_scaled_vector_3 scale = geom_traits().construct_scaled_vector_3_object();
+
+    const Point_3& neighbor_cc = circumcenter(neighbor);
+    const Ball_3 neighbor_cc_offset_ball = ball(neighbor_cc, m_sq_offset);
+    const bool is_neighbor_cc_in_offset = m_oracle.do_intersect(neighbor_cc_offset_ball);
+
+#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+    std::cout << "Compute_steiner_point(" << &*ch << ", " << &*neighbor << ")" << std::endl;
+
+    const Point_3& chc = circumcenter(ch);
+    std::cout << "CH" << std::endl;
+    std::cout << "\t" << ch->vertex(0)->point() << std::endl;
+    std::cout << "\t" << ch->vertex(1)->point() << std::endl;
+    std::cout << "\t" << ch->vertex(2)->point() << std::endl;
+    std::cout << "\t" << ch->vertex(3)->point() << std::endl;
+    std::cout << "cc: " << chc << std::endl;
+    std::cout << "CC Distance to input: " << CGAL::squared_distance(chc, m_oracle.closest_point(chc)) << std::endl;
+
+    std::cout << "NCH" << std::endl;
+    std::cout << "\t" << neighbor->vertex(0)->point() << std::endl;
+    std::cout << "\t" << neighbor->vertex(1)->point() << std::endl;
+    std::cout << "\t" << neighbor->vertex(2)->point() << std::endl;
+    std::cout << "\t" << neighbor->vertex(3)->point() << std::endl;
+    std::cout << "ncc: " << neighbor_cc << std::endl;
+    std::cout << "NC Distance to input: " << CGAL::squared_distance(neighbor_cc, m_oracle.closest_point(neighbor_cc)) << std::endl;
+    std::cout << "is_neighbor_cc_in_offset = " << is_neighbor_cc_in_offset << std::endl;
+
+    std::cout << "squared offset " << m_sq_offset << std::endl;
+#endif
+
+    // ch's circumcenter should not be within the offset volume
+    CGAL_assertion_code(const Point_3& ch_cc = circumcenter(ch);)
+    CGAL_assertion_code(const Ball_3 ch_cc_offset_ball = ball(ch_cc, m_sq_offset);)
+    CGAL_assertion(!m_oracle.do_intersect(ch_cc_offset_ball));
+
+    if(is_neighbor_cc_in_offset)
+    {
+      const Point_3& ch_cc = circumcenter(ch);
 
       // If the voronoi edge intersects the offset, the steiner point is the first intersection
       if(m_oracle.first_intersection(ch_cc, neighbor_cc, steiner_point, m_offset))
@@ -1332,7 +1755,6 @@ bool is_traversable(const Facet& f) const
       // steiner point is the closest point on input from cell centroid with offset
       const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
       CGAL_assertion(closest_pt != neighbor_cc);
-      // const Ball_3 closest_pt_offset_ball = ball(neighbor_cc, m_sq_offset*1.1);
 
       Vector_3 unit = vector(closest_pt, neighbor_cc);
 
@@ -1356,93 +1778,164 @@ bool is_traversable(const Facet& f) const
     return false;
   }
 
+    // normal steiner computation
+  bool compute_steiner_point(const Cell_handle ch,
+                             const Cell_handle neighbor,
+                             Point_3& steiner_point) const
+  {
+    CGAL_precondition(!m_tr.is_infinite(neighbor));
 
-//   bool compute_steiner_point(const Cell_handle ch,
-//                              const Cell_handle neighbor,
-//                              Point_3& steiner_point) const
-//   {
-//     CGAL_precondition(!m_tr.is_infinite(neighbor));
-//
-//     typename Geom_traits::Construct_ball_3 ball = geom_traits().construct_ball_3_object();
-//     typename Geom_traits::Construct_vector_3 vector = geom_traits().construct_vector_3_object();
-//     typename Geom_traits::Construct_translated_point_3 translate = geom_traits().construct_translated_point_3_object();
-//     typename Geom_traits::Construct_scaled_vector_3 scale = geom_traits().construct_scaled_vector_3_object();
-//
-//     const Point_3& neighbor_cc = circumcenter(neighbor);
-//     const Ball_3 neighbor_cc_offset_ball = ball(neighbor_cc, m_sq_offset);
-//     const bool is_neighbor_cc_in_offset = m_oracle.do_intersect(neighbor_cc_offset_ball);
-//
-// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
-//     std::cout << "Compute_steiner_point(" << &*ch << ", " << &*neighbor << ")" << std::endl;
-//
-//     const Point_3& chc = circumcenter(ch);
-//     std::cout << "CH" << std::endl;
-//     std::cout << "\t" << ch->vertex(0)->point() << std::endl;
-//     std::cout << "\t" << ch->vertex(1)->point() << std::endl;
-//     std::cout << "\t" << ch->vertex(2)->point() << std::endl;
-//     std::cout << "\t" << ch->vertex(3)->point() << std::endl;
-//     std::cout << "cc: " << chc << std::endl;
-//     std::cout << "CC Distance to input: " << CGAL::squared_distance(chc, m_oracle.closest_point(chc)) << std::endl;
-//
-//     std::cout << "NCH" << std::endl;
-//     std::cout << "\t" << neighbor->vertex(0)->point() << std::endl;
-//     std::cout << "\t" << neighbor->vertex(1)->point() << std::endl;
-//     std::cout << "\t" << neighbor->vertex(2)->point() << std::endl;
-//     std::cout << "\t" << neighbor->vertex(3)->point() << std::endl;
-//     std::cout << "ncc: " << neighbor_cc << std::endl;
-//     std::cout << "NC Distance to input: " << CGAL::squared_distance(neighbor_cc, m_oracle.closest_point(neighbor_cc)) << std::endl;
-//     std::cout << "is_neighbor_cc_in_offset = " << is_neighbor_cc_in_offset << std::endl;
-//
-//     std::cout << "squared offset " << m_sq_offset << std::endl;
-// #endif
-//
-//     // ch's circumcenter should not be within the offset volume
-//     CGAL_assertion_code(const Point_3& ch_cc = circumcenter(ch);)
-//     CGAL_assertion_code(const Ball_3 ch_cc_offset_ball = ball(ch_cc, m_sq_offset);)
-//     CGAL_assertion(!m_oracle.do_intersect(ch_cc_offset_ball));
-//
-//     if(is_neighbor_cc_in_offset)
-//     {
-//       const Point_3& ch_cc = circumcenter(ch);
-//
-//       // If the voronoi edge intersects the offset, the steiner point is the first intersection
-//       if(m_oracle.first_intersection(ch_cc, neighbor_cc, steiner_point, m_offset))
-//       {
-// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
-//         std::cout << "Steiner found through first_intersection(): " << steiner_point << std::endl;
-// #endif
-//         return true;
-//       }
-//     }
-//
-//     Tetrahedron_with_outside_info<Geom_traits> tet(neighbor, geom_traits());
-//     if(m_oracle.do_intersect(tet))
-//     {
-//       // steiner point is the closest point on input from cell centroid with offset
-//       const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
-//       CGAL_assertion(closest_pt != neighbor_cc);
-//
-//       Vector_3 unit = vector(closest_pt, neighbor_cc);
-//
-//       // PMP::internal::normalize() requires sqrt()
-//       unit = scale(unit, m_offset / approximate_sqrt(geom_traits().compute_squared_length_3_object()(unit)));
-//       steiner_point = translate(closest_pt, unit);
-//
-// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
-//       std::cout << "Steiner found through neighboring tet intersecting the input: " << steiner_point << std::endl;
-//       std::cout << "Closest point: " << closest_pt << std::endl;
-//       std::cout << "Direction: " << vector(closest_pt, neighbor_cc) << std::endl;
-// #endif
-//
-//       return true;
-//     }
-//
-// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
-//     std::cout << "No Steiner point" << std::endl;
-// #endif
-//
-//     return false;
-//   }
+    typename Geom_traits::Construct_ball_3 ball = geom_traits().construct_ball_3_object();
+    typename Geom_traits::Construct_vector_3 vector = geom_traits().construct_vector_3_object();
+    typename Geom_traits::Construct_translated_point_3 translate = geom_traits().construct_translated_point_3_object();
+    typename Geom_traits::Construct_scaled_vector_3 scale = geom_traits().construct_scaled_vector_3_object();
+    typename Geom_traits::Construct_midpoint_3 construct_midpoint = geom_traits().construct_midpoint_3_object();
+    typename Geom_traits::Compute_squared_distance_3 sq_dist = geom_traits().compute_squared_distance_3_object();
+
+    const Point_3& neighbor_cc = circumcenter(neighbor);
+    const Ball_3 neighbor_cc_offset_ball = ball(neighbor_cc, m_sq_offset);
+    const bool is_neighbor_cc_in_offset = m_oracle.do_intersect(neighbor_cc_offset_ball);
+
+
+#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+    std::cout << "Compute_steiner_point(" << &*ch << ", " << &*neighbor << ")" << std::endl;
+
+    const Point_3& chc = circumcenter(ch);
+    std::cout << "CH" << std::endl;
+    std::cout << "\t" << ch->vertex(0)->point() << std::endl;
+    std::cout << "\t" << ch->vertex(1)->point() << std::endl;
+    std::cout << "\t" << ch->vertex(2)->point() << std::endl;
+    std::cout << "\t" << ch->vertex(3)->point() << std::endl;
+    std::cout << "cc: " << chc << std::endl;
+    std::cout << "CC Distance to input: " << CGAL::squared_distance(chc, m_oracle.closest_point(chc)) << std::endl;
+
+    std::cout << "NCH" << std::endl;
+    std::cout << "\t" << neighbor->vertex(0)->point() << std::endl;
+    std::cout << "\t" << neighbor->vertex(1)->point() << std::endl;
+    std::cout << "\t" << neighbor->vertex(2)->point() << std::endl;
+    std::cout << "\t" << neighbor->vertex(3)->point() << std::endl;
+    std::cout << "ncc: " << neighbor_cc << std::endl;
+    std::cout << "NC Distance to input: " << CGAL::squared_distance(neighbor_cc, m_oracle.closest_point(neighbor_cc)) << std::endl;
+    std::cout << "is_neighbor_cc_in_offset = " << is_neighbor_cc_in_offset << std::endl;
+
+    std::cout << "squared offset " << m_sq_offset << std::endl;
+#endif
+
+    // ch's circumcenter should not be within the offset volume
+    CGAL_assertion_code(const Point_3& ch_cc = circumcenter(ch);)
+    CGAL_assertion_code(const Ball_3 ch_cc_offset_ball = ball(ch_cc, m_sq_offset);)
+    CGAL_assertion(!m_oracle.do_intersect(ch_cc_offset_ball));
+
+  Point_3 pts[3];
+  int fi = ch->index(neighbor);
+  for(int j=0, k=0; j<4; ++j) {
+    if(j != fi) pts[k++] = ch->vertex(j)->point();
+  }
+
+  // --- 2. Check Traversability ---
+  Facet f = Facet(ch, fi);
+  if (less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr)) {
+    // std::cout << "face is traversible!" << std::endl;
+  }
+  if (!less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr)) {
+    // std::cout << "face is NOT traversible!" << std::endl;
+    Tetrahedron_with_outside_info<Geom_traits> tet(neighbor, geom_traits());
+    if(m_oracle.do_intersect(tet))
+    {
+      // steiner point is the closest point on input from cell centroid with offset
+      const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
+      CGAL_assertion(closest_pt != neighbor_cc);
+
+      Point_3 edge_mid12 = construct_midpoint(pts[0], pts[1]);
+      Point_3 edge_mid23 = construct_midpoint(pts[1], pts[2]);
+      Point_3 edge_mid31 = construct_midpoint(pts[2], pts[0]);
+      // compute distances to input from midpoints of face edges
+      const Point_3 closest_pt12 = m_oracle.closest_point(edge_mid12);
+      const Point_3 closest_pt23 = m_oracle.closest_point(edge_mid23);
+      const Point_3 closest_pt31 = m_oracle.closest_point(edge_mid31);
+
+      // 2. Compute the distances
+      FT d12_sq = sq_dist(edge_mid12, closest_pt12);
+      FT d23_sq = sq_dist(edge_mid23, closest_pt23);
+      FT d31_sq = sq_dist(edge_mid31, closest_pt31);
+
+      Point_3 face_mid = edge_mid12;
+      if (d12_sq >= d23_sq && d12_sq >= d31_sq) {
+        face_mid = edge_mid12;
+      }
+      if (d23_sq >= d31_sq && d23_sq >= d12_sq) {
+        face_mid = edge_mid23;
+      }
+      if (d31_sq >= d12_sq && d31_sq >= d23_sq) {
+        face_mid = edge_mid31;
+      }
+
+      // Point_3 face_mid = CGAL::centroid(pts[0], pts[1], pts[2]);
+      if(m_oracle.first_intersection(face_mid, closest_pt, steiner_point, m_offset))
+      {
+#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+        std::cout << "Steiner found through first_intersection(): " << steiner_point << std::endl;
+#endif
+        return true;
+      }
+
+      // normal logic
+      Vector_3 unit = vector(closest_pt, neighbor_cc);
+      // PMP::internal::normalize() requires sqrt()
+      unit = scale(unit, m_offset / approximate_sqrt(geom_traits().compute_squared_length_3_object()(unit)));
+      steiner_point = translate(closest_pt, unit);
+
+#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+      std::cout << "Steiner found through neighboring tet intersecting the input: " << steiner_point << std::endl;
+      std::cout << "Closest point: " << closest_pt << std::endl;
+      std::cout << "Direction: " << vector(closest_pt, neighbor_cc) << std::endl;
+#endif
+
+      return true;
+    }
+  }
+    if(is_neighbor_cc_in_offset)
+    {
+      const Point_3& ch_cc = circumcenter(ch);
+
+      // If the voronoi edge intersects the offset, the steiner point is the first intersection
+      if(m_oracle.first_intersection(ch_cc, neighbor_cc, steiner_point, m_offset))
+      {
+#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+        std::cout << "Steiner found through first_intersection(): " << steiner_point << std::endl;
+#endif
+        return true;
+      }
+    }
+
+    Tetrahedron_with_outside_info<Geom_traits> tet(neighbor, geom_traits());
+    if(m_oracle.do_intersect(tet))
+    {
+      // steiner point is the closest point on input from cell centroid with offset
+      const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
+      CGAL_assertion(closest_pt != neighbor_cc);
+
+      Vector_3 unit = vector(closest_pt, neighbor_cc);
+
+      // PMP::internal::normalize() requires sqrt()
+      unit = scale(unit, m_offset / approximate_sqrt(geom_traits().compute_squared_length_3_object()(unit)));
+      steiner_point = translate(closest_pt, unit);
+
+#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+      std::cout << "Steiner found through neighboring tet intersecting the input: " << steiner_point << std::endl;
+      std::cout << "Closest point: " << closest_pt << std::endl;
+      std::cout << "Direction: " << vector(closest_pt, neighbor_cc) << std::endl;
+#endif
+
+      return true;
+    }
+
+#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+    std::cout << "No Steiner point" << std::endl;
+#endif
+
+    return false;
+  }
 
 private:
   // A permissive gate is a gate that we can traverse without checking its circumradius
