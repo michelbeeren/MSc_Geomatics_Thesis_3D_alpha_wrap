@@ -72,7 +72,7 @@ std::vector<Point_3> _surface_sampling(const Mesh& mesh, const double relative_a
         std::back_inserter(surface_points),
         CGAL::parameters::use_random_uniform_sampling(true)
                         .number_of_points_per_area_unit(density)
-                        .do_sample_vertices(false)
+                        .do_sample_vertices(true)
                         .do_sample_edges(true)
                         .do_sample_faces(true)
     );

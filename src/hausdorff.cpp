@@ -9,6 +9,15 @@
 #include <CGAL/AABB_traits.h>
 #include <CGAL/Real_timer.h>
 #include <CGAL/alpha_wrap_3.h>
+#pragma once
+
+#include <vector>
+#include <string>
+#include <fstream>
+#include <stdexcept>
+
+#include <CGAL/Simple_cartesian.h>
+#include <CGAL/Surface_mesh.h>
 
 // using namespace CGAL;
 using K = CGAL::Exact_predicates_inexact_constructions_kernel;
@@ -114,6 +123,46 @@ void hausdorff_distance(Mesh& wrapped_mesh, const Mesh& original_mesh, const dou
         }
 
         fcolor[f] = Color(r, g, b);
+    }
+}
+
+std::vector<double> point_to_mesh_distances(
+    const std::vector<Point_3>& sample_points,
+    const Mesh& target_mesh)
+{
+    typedef CGAL::AABB_face_graph_triangle_primitive<Mesh> Primitive;
+    typedef CGAL::AABB_traits<K, Primitive>                AABB_traits;
+    typedef CGAL::AABB_tree<AABB_traits>                   Tree;
+
+    Tree tree(faces(target_mesh).begin(),
+              faces(target_mesh).end(),
+              target_mesh);
+    tree.accelerate_distance_queries();
+
+    std::vector<double> distances;
+    distances.reserve(sample_points.size());
+
+    for (const Point_3& p : sample_points)
+    {
+        double dist = std::sqrt(tree.squared_distance(p));
+        distances.push_back(dist);
+    }
+
+    return distances;
+}
+
+void write_distances_to_csv(const std::string& filename,
+                            const std::vector<double>& distances)
+{
+    std::ofstream out(filename);
+    if (!out) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+
+    out << "index,distance\n";
+
+    for (std::size_t i = 0; i < distances.size(); ++i) {
+        out << i << "," << distances[i] << "\n";
     }
 }
 

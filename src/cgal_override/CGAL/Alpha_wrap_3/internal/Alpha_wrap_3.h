@@ -1824,7 +1824,7 @@ bool compute_steiner_point4(const Cell_handle ch,
   return true;
 }
 
-    // normal steiner computation
+    // modified steiner computation
   bool compute_steiner_point(const Cell_handle ch,
                              const Cell_handle neighbor,
                              Point_3& steiner_point) const

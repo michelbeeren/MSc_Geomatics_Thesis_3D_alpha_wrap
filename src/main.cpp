@@ -50,6 +50,7 @@ using Tree        = CGAL::AABB_tree<AABB_traits>;
 #include "edge_refinement.h"
 #include "octree.h"
 #include "MAT.h"
+#include "hausdorff.h"
 
 // ==================================================================================
 // ==================================== MAIN ========================================
@@ -61,7 +62,7 @@ int main(int argc, char** argv)
     std::cout << "------------------------------------------------------------" << std::endl;
   std::cout << "Reading input: " << filename << std::endl;
 
-  const double relative_alpha = 50; //2000. //20. //1000.
+  const double relative_alpha = 300; //2000. //20. //1000.
   const double relative_offset = 10000.; // 7000. //600. //12000.
 
     // ----------------------MESH INPUT FILE (optional: compute normals and tree)------------------
@@ -71,12 +72,18 @@ int main(int argc, char** argv)
     std::cout << "face_normals.size = " << face_normals.size() << std::endl;
     Tree& tree = *data.tree;
 
+
     // ----------------------------IS INPUT MESH VALID?------------------------------------
     valid_mesh_boolean(mesh);
 
 
     // ------------------------------ALPHA WRAP INPUT---------------------------------------
-    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, data, false, false, true, true, false); // set both to false if you do not want to write out the file and test if valid
+    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, data, false, true, true, false, true); // set both to false if you do not want to write out the file and test if valid
+    std::vector<Point_3> samples = _surface_sampling(mesh, 200.0);
+    std::vector<double> distances = point_to_mesh_distances(samples, alpha_wrap);
+    std::cout << "distances.size() = " << distances.size() << std::endl;
+    std::cout << "samples.size() = " << samples.size() << std::endl;
+    write_distances_to_csv("../data/Output/stats/distances_bk_normal.csv", distances);
     // -------------------------- alpha wrap from inside -----------------------------------
     // Mesh alpha_inside_wrap = _3D_alpha_inside_wrap( filename,relative_alpha,relative_offset, mesh, true, false);
 

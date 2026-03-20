@@ -25,5 +25,7 @@ namespace PMP = CGAL::Polygon_mesh_processing;
 
 void hausdorff_distance(Mesh& wrapped_mesh, const Mesh& original_mesh, const double filter);
 void write_hausdorff_distance(const Mesh& wrapped_mesh, const std::string& filename);
+std::vector<double> point_to_mesh_distances(const std::vector<Point_3>& sample_points, const Mesh& target_mesh);
+void write_distances_to_csv(const std::string& filename, const std::vector<double>& distances);
 
 #endif //THESIS_HAUSDORFF_H
