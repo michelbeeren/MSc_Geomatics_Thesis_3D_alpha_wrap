@@ -976,45 +976,59 @@ bool is_traversable(const Facet& f) const
       // std::cout << "face is traversible!" << std::endl;
       return traversable;
     }
-    else {
-      // std::cout << "face is not traversible!" << std::endl;
-      // ---- 2. Compute face midpoint ----
-      const Cell_handle ch = f.first;
-      const int i = f.second;
-
-      const Point_3& p0 = ch->vertex((i + 1) & 3)->point();
-      const Point_3& p1 = ch->vertex((i + 2) & 3)->point();
-      const Point_3& p2 = ch->vertex((i + 3) & 3)->point();
-
-      const Point_3 f_mid(
-          (p0.x() + p1.x() + p2.x()) / 3.0,
-          (p0.y() + p1.y() + p2.y()) / 3.0,
-          (p0.z() + p1.z() + p2.z()) / 3.0
-      );
-
-      // ---- 3. Distance to input surface via Oracle ----
-      const Point_3 closest_pt = m_oracle.closest_point(f_mid);
-
-      const FT sq_d =
-          geom_traits().compute_squared_distance_3_object()(f_mid, closest_pt);
-
-      const double dist_input =
-          std::sqrt(CGAL::to_double(sq_d));
-
-      // ---- 4. Distance to offset surface (optional) ----
-      const double dist_offset =
-          dist_input - CGAL::to_double(m_offset);
-
-      const double tolerance = 1.2 * m_offset;
-
-      if (dist_input > tolerance) {
-        // std::cout << "tolerance = " << tolerance << std::endl;
-        // std::cout << "Distance midpoint -> input surface: "<< dist_input << std::endl;
-        // std::cout << "Distance midpoint -> offset surface: " << dist_offset << std::endl;
-        // std::cout << "Oof distance of triangle far from offset!" << std::endl;
-        return true;
-      }
-    }
+    // else {
+    //   // std::cout << "face is not traversible!" << std::endl;
+    //   // ---- 2. Compute face midpoint ----
+    //   const Cell_handle ch = f.first;
+    //   const int i = f.second;
+    //
+    //   const Point_3& p0 = ch->vertex((i + 1) & 3)->point();
+    //   const Point_3& p1 = ch->vertex((i + 2) & 3)->point();
+    //   const Point_3& p2 = ch->vertex((i + 3) & 3)->point();
+    //   // typename Geom_traits::Line_3 l12(p1, p2);
+    //   // typename Geom_traits::Line_3 l02(p0, p2);
+    //   // typename Geom_traits::Line_3 l01(p0, p1);
+    //   //
+    //   // double min_size_tr = 0.5*m_offset;
+    //   //
+    //   // double d0 = std::sqrt(CGAL::to_double(CGAL::squared_distance(p0, l12)));
+    //   // double d1 = std::sqrt(CGAL::to_double(CGAL::squared_distance(p1, l02)));
+    //   // double d2 = std::sqrt(CGAL::to_double(CGAL::squared_distance(p2, l01)));
+    //   // if (d0 < min_size_tr || d1 < min_size_tr || d2 < min_size_tr) {
+    //   //   return false;
+    //   // }
+    //
+    //   // std::cout << "distances to opposite lines are:" << d0 << ", " << d1 << ", " << d2 << std::endl;
+    //
+    //   const Point_3 f_mid(
+    //       (p0.x() + p1.x() + p2.x()) / 3.0,
+    //       (p0.y() + p1.y() + p2.y()) / 3.0,
+    //       (p0.z() + p1.z() + p2.z()) / 3.0
+    //   );
+    //
+    //   // ---- 3. Distance to input surface via Oracle ----
+    //   const Point_3 closest_pt = m_oracle.closest_point(f_mid);
+    //
+    //   const FT sq_d =
+    //       geom_traits().compute_squared_distance_3_object()(f_mid, closest_pt);
+    //
+    //   const double dist_input =
+    //       std::sqrt(CGAL::to_double(sq_d));
+    //
+    //   // ---- 4. Distance to offset surface (optional) ----
+    //   const double dist_offset =
+    //       dist_input - CGAL::to_double(m_offset);
+    //
+    //   const double tolerance = 1.2 * m_offset;
+    //
+    //   if (dist_input > tolerance) {
+    //     // std::cout << "tolerance = " << tolerance << std::endl;
+    //     // std::cout << "Distance midpoint -> input surface: "<< dist_input << std::endl;
+    //     // std::cout << "Distance midpoint -> offset surface: " << dist_offset << std::endl;
+    //     // std::cout << "Oof distance of triangle far from offset!" << std::endl;
+    //     return true;
+    //   }
+    // }
     return traversable;
   }
 
@@ -1038,6 +1052,7 @@ bool is_traversable(const Facet& f) const
 
         const double local_alpha = CGAL::to_double(m_alpha) * std::pow(fs_safe, 0.85); // alpha*3 for ref_depth=1, alpha*0.3 for ref_depth=9
         const FT local_sq_alpha = FT(local_alpha * local_alpha);
+      // std:: cout << "does function come here?" << std::endl;
 
         return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
     }
@@ -1691,7 +1706,7 @@ bool compute_steiner_point4(const Cell_handle ch,
 }
 
   // normal steiner computation
-  bool compute_steiner_point_normal(const Cell_handle ch,
+  bool compute_steiner_point(const Cell_handle ch,
                              const Cell_handle neighbor,
                              Point_3& steiner_point) const
   {
@@ -1825,7 +1840,7 @@ bool compute_steiner_point4(const Cell_handle ch,
 }
 
     // modified steiner computation
-  bool compute_steiner_point(const Cell_handle ch,
+  bool compute_steiner_point8(const Cell_handle ch,
                              const Cell_handle neighbor,
                              Point_3& steiner_point) const
   {
