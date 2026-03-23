@@ -997,6 +997,7 @@ bool use_mat(const Facet& f) const
   // return bool of if the face is traversible or not based on the local alpha
   return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);}
 
+  // function to change is_traversible rules; now set local alpha's based on proximity of sharp concave edge based on adaptive octree
 bool use_octree(const Facet& f) const{
   const Cell_handle ch = f.first; // current cell
   const int i = f.second; // neighboring cell
@@ -1072,39 +1073,70 @@ bool too_far_from_input(const Facet& f) const {
 
 bool is_traversable(const Facet& f) const
 {
+  // ToDo implement too_far_from_input as parameter --> if (check_face_distance_to_input) {do this next part} also for next parts
+  bool check_face_distance_from_input = false;
   // A) Default CGAL behavior: when neither MAT nor Octree is used
   if ((!m_use_mat || !m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr))
   {
     // Alpha condition
     bool traversable = less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
 
-    // ToDo implement too_far_from_input as parameter --> if (check_face_distance_to_input) {do this next part} also for next parts
-    if (traversable) {
-      return traversable;
+    if (check_face_distance_from_input)
+    {
+      if (traversable) {
+        return traversable;
+      }
+      // only check if a face midpoint is too far from input if face normally is not traversable
+        // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
+      traversable = too_far_from_input(f);
     }
-    // only check if a face midpoint is too far from input if face normally is not traversable
-    traversable = too_far_from_input(f);
-    // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
+
     return traversable;
   }
 
   // A) MAT-based behavior: when MAT is used
   if ((m_use_mat || m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr)) {
     bool traversable = use_mat(f); // check if face is traversable using MAT implementation
+    if (check_face_distance_from_input)
+    {
+      if (traversable) {
+        return traversable;
+      }
+      // only check if a face midpoint is too far from input if face normally is not traversable
+      // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
+      traversable = too_far_from_input(f);
+    }
       return traversable;
   }
 
   // B) Octree-based behavior: when Octree is used but no MAT
   if ((!m_use_mat || !m_fs_mat_ptr) && (m_use_octree || m_octree_ptr)) {
     bool traversable = use_octree(f);
+    if (check_face_distance_from_input)
+    {
+      if (traversable) {
+        return traversable;
+      }
+      // only check if a face midpoint is too far from input if face normally is not traversable
+      // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
+      traversable = too_far_from_input(f);
+    }
     return traversable;
   }
 
   // C) Default case: safety; use default case if traversability has not been checked yet
   bool traversable = less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
+  if (check_face_distance_from_input)
+  {
+    if (traversable) {
+      return traversable;
+    }
+    // only check if a face midpoint is too far from input if face normally is not traversable
+    // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
+    traversable = too_far_from_input(f);
+  }
   return traversable;
 }
-
 
   // normal steiner computation
   bool compute_steiner_point(const Cell_handle ch,
