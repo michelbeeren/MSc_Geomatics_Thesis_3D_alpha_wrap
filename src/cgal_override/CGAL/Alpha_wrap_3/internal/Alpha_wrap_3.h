@@ -1042,6 +1042,7 @@ bool use_octree(const Facet& f) const{
   return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
 }
 
+  // function which checks if face midpoint is too far from input
 bool too_far_from_input(const Facet& f) const {
   const Cell_handle ch = f.first; // current cell
   const int i = f.second; // neighbor cell
@@ -1071,10 +1072,11 @@ bool too_far_from_input(const Facet& f) const {
   return false;
 }
 
+  // function to check if a face is traversible
 bool is_traversable(const Facet& f) const
 {
   // ToDo implement too_far_from_input as parameter --> if (check_face_distance_to_input) {do this next part} also for next parts
-  bool check_face_distance_from_input = false;
+  bool check_face_distance_from_input = true;
   // A) Default CGAL behavior: when neither MAT nor Octree is used
   if ((!m_use_mat || !m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr))
   {
@@ -1138,8 +1140,133 @@ bool is_traversable(const Facet& f) const
   return traversable;
 }
 
-  // normal steiner computation
-  bool compute_steiner_point(const Cell_handle ch,
+  // =================================== HELPERS FOR MODIFIED COMPUTE_STEINER_POINT FUNCTION ================================
+// ToDo not used yet, but maybe eventually optimize best place on triangle computation
+  bool compute_edge_optimum(const Point_3& a,
+                            const Point_3& b,
+                            const Point_3& edge_mid,
+                            Point_3& p_opt) const
+{
+  typename Geom_traits::Construct_vector_3 vector =
+      geom_traits().construct_vector_3_object();
+  auto cross = geom_traits().construct_cross_product_vector_3_object();
+  auto sq_length = geom_traits().compute_squared_length_3_object();
+
+  const Point_3 closest_a = m_oracle.closest_point(a);
+  const Point_3 closest_b = m_oracle.closest_point(b);
+
+  const Vector_3 e  = vector(a, b);
+  const Vector_3 na = vector(a, closest_a);
+  const Vector_3 nb = vector(b, closest_b);
+
+  const double len_e  = std::sqrt(CGAL::to_double(sq_length(e)));
+  const double len_na = std::sqrt(CGAL::to_double(sq_length(na)));
+  const double len_nb = std::sqrt(CGAL::to_double(sq_length(nb)));
+
+  const double eps = 1e-12;
+  if (len_e < eps || len_na < eps || len_nb < eps) {
+    p_opt = edge_mid;
+    return false;
+  }
+
+  double sin_a =
+      std::sqrt(CGAL::to_double(sq_length(cross(na, e)))) / (len_na * len_e);
+  double sin_b =
+      std::sqrt(CGAL::to_double(sq_length(cross(nb, e)))) / (len_nb * len_e);
+
+  sin_a = std::max(0.0, std::min(1.0, sin_a));
+  sin_b = std::max(0.0, std::min(1.0, sin_b));
+
+  const double denom = sin_a + sin_b;
+  if (denom < eps) {
+    p_opt = edge_mid;
+    return false;
+  }
+
+  const double t = sin_b / denom;
+  p_opt = a + t * e;
+  return true;
+}
+
+  // approximate furthest point on triangle
+  Point_3 furthest_point_on_triangle(const Point_3 pt1, const Point_3 pt2, const Point_3 pt3) const {
+  typename Geom_traits::Construct_vector_3 vector = geom_traits().construct_vector_3_object();
+  typename Geom_traits::Construct_translated_point_3 translate = geom_traits().construct_translated_point_3_object();
+  typename Geom_traits::Construct_scaled_vector_3 scale = geom_traits().construct_scaled_vector_3_object();
+  typename Geom_traits::Construct_midpoint_3 construct_midpoint = geom_traits().construct_midpoint_3_object();
+  typename Geom_traits::Compute_squared_distance_3 sq_dist = geom_traits().compute_squared_distance_3_object();
+  auto cross = geom_traits().construct_cross_product_vector_3_object();
+  auto sq_length = geom_traits().compute_squared_length_3_object();
+       Point_3 face_mid = mid_pt_of_triangle(pt1, pt2, pt3);
+  // compute midpoints on triangle edges
+  Point_3 edge_mid01 = construct_midpoint(pt1, pt2);
+  Point_3 edge_mid12 = construct_midpoint(pt2, pt3);
+  Point_3 edge_mid20 = construct_midpoint(pt3, pt1);
+
+      // ToDo; make a better approximation for furthest point on triangle
+  // // compute optimal points on each edge
+  // Point_3 p_opt01 = edge_mid01;
+  // Point_3 p_opt12 = edge_mid12;
+  // Point_3 p_opt20 = edge_mid20;
+  //
+  // compute_edge_optimum(pts[0], pts[1], edge_mid01, p_opt01);
+  // compute_edge_optimum(pts[1], pts[2], edge_mid12, p_opt12);
+  // compute_edge_optimum(pts[2], pts[0], edge_mid20, p_opt20);
+
+  // closest points on input for the 3 edge midpoints
+  const Point_3 closest_pt01 = m_oracle.closest_point(edge_mid01);
+  const Point_3 closest_pt12 = m_oracle.closest_point(edge_mid12);
+  const Point_3 closest_pt20 = m_oracle.closest_point(edge_mid20);
+
+  // // closest points on input for the 3 optimal edge points
+  // const Point_3 closest_pt_opt01 = m_oracle.closest_point(p_opt01);
+  // const Point_3 closest_pt_opt12 = m_oracle.closest_point(p_opt12);
+  // const Point_3 closest_pt_opt20 = m_oracle.closest_point(p_opt20);
+
+  // squared distances to input for all 6 candidates
+  FT d_mid01_sq = sq_dist(edge_mid01, closest_pt01);
+  FT d_mid12_sq = sq_dist(edge_mid12, closest_pt12);
+  FT d_mid20_sq = sq_dist(edge_mid20, closest_pt20);
+
+  // FT d_opt01_sq = sq_dist(p_opt01, closest_pt_opt01);
+  // FT d_opt12_sq = sq_dist(p_opt12, closest_pt_opt12);
+  // FT d_opt20_sq = sq_dist(p_opt20, closest_pt_opt20);
+
+  // choose the point farthest from the input
+  Point_3 edge_mid = edge_mid01;
+  FT max_d_sq = d_mid01_sq;
+
+  if (d_mid12_sq > max_d_sq) {
+    max_d_sq = d_mid12_sq;
+    edge_mid = edge_mid12;
+  }
+  if (d_mid20_sq > max_d_sq) {
+    max_d_sq = d_mid20_sq;
+    edge_mid = edge_mid20;
+  }
+
+  // if (d_opt01_sq > max_d_sq) {
+  //   max_d_sq = d_opt01_sq;
+  //   face_mid = p_opt01;
+  // }
+  // if (d_opt12_sq > max_d_sq) {
+  //   max_d_sq = d_opt12_sq;
+  //   face_mid = p_opt12;
+  // }
+  // if (d_opt20_sq > max_d_sq) {
+  //   max_d_sq = d_opt20_sq;
+  //   face_mid = p_opt20;
+  // }
+
+      // choosing furthest edge mid point, leads to consecutive points, therefore, move point slightly towards edge mid
+      Vector_3 from_face_mid = vector(face_mid,edge_mid);
+
+      Point_3 face_pt = face_mid + 0.95*from_face_mid;
+  return face_pt;
+}
+
+    // normal steiner computation
+  bool compute_steiner_point_normal(const Cell_handle ch,
                              const Cell_handle neighbor,
                              Point_3& steiner_point) const
   {
@@ -1226,54 +1353,10 @@ bool is_traversable(const Facet& f) const
     return false;
   }
 
-  bool compute_edge_optimum(const Point_3& a,
-                            const Point_3& b,
-                            const Point_3& edge_mid,
-                            Point_3& p_opt) const
-{
-  typename Geom_traits::Construct_vector_3 vector =
-      geom_traits().construct_vector_3_object();
-  auto cross = geom_traits().construct_cross_product_vector_3_object();
-  auto sq_length = geom_traits().compute_squared_length_3_object();
 
-  const Point_3 closest_a = m_oracle.closest_point(a);
-  const Point_3 closest_b = m_oracle.closest_point(b);
 
-  const Vector_3 e  = vector(a, b);
-  const Vector_3 na = vector(a, closest_a);
-  const Vector_3 nb = vector(b, closest_b);
-
-  const double len_e  = std::sqrt(CGAL::to_double(sq_length(e)));
-  const double len_na = std::sqrt(CGAL::to_double(sq_length(na)));
-  const double len_nb = std::sqrt(CGAL::to_double(sq_length(nb)));
-
-  const double eps = 1e-12;
-  if (len_e < eps || len_na < eps || len_nb < eps) {
-    p_opt = edge_mid;
-    return false;
-  }
-
-  double sin_a =
-      std::sqrt(CGAL::to_double(sq_length(cross(na, e)))) / (len_na * len_e);
-  double sin_b =
-      std::sqrt(CGAL::to_double(sq_length(cross(nb, e)))) / (len_nb * len_e);
-
-  sin_a = std::max(0.0, std::min(1.0, sin_a));
-  sin_b = std::max(0.0, std::min(1.0, sin_b));
-
-  const double denom = sin_a + sin_b;
-  if (denom < eps) {
-    p_opt = edge_mid;
-    return false;
-  }
-
-  const double t = sin_b / denom;
-  p_opt = a + t * e;
-  return true;
-}
-
-    // modified steiner computation
-  bool compute_steiner_point8(const Cell_handle ch,
+      // modified steiner computation
+  bool compute_steiner_point_modified(const Cell_handle ch,
                              const Cell_handle neighbor,
                              Point_3& steiner_point) const
   {
@@ -1289,9 +1372,9 @@ bool is_traversable(const Facet& f) const
     auto sq_length = geom_traits().compute_squared_length_3_object();
 
     const Point_3& neighbor_cc = circumcenter(neighbor);
+    const Point_3& ch_cc = circumcenter(ch);
     const Ball_3 neighbor_cc_offset_ball = ball(neighbor_cc, m_sq_offset);
     const bool is_neighbor_cc_in_offset = m_oracle.do_intersect(neighbor_cc_offset_ball);
-
 
 #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
     std::cout << "Compute_steiner_point(" << &*ch << ", " << &*neighbor << ")" << std::endl;
@@ -1322,121 +1405,63 @@ bool is_traversable(const Facet& f) const
     CGAL_assertion_code(const Ball_3 ch_cc_offset_ball = ball(ch_cc, m_sq_offset);)
     CGAL_assertion(!m_oracle.do_intersect(ch_cc_offset_ball));
 
+  // ToDo; This should be implemented nicer, but the idea is that only the modified method of steiner insertion is used for small faces. But now a bit double.
+  // get points of current face
   Point_3 pts[3];
   int fi = ch->index(neighbor);
   for(int j=0, k=0; j<4; ++j) {
     if(j != fi) pts[k++] = ch->vertex(j)->point();
   }
 
-  // --- 2. Check Traversability ---
+  // construct the face
   Facet f = Facet(ch, fi);
 
-
-  const bool traversible = less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
-  if (traversible) {
+  // ToDo maybe play a bit with m_sq_alpha value, maybe 'x*m_sq_alpha' gives a better result
+  const bool traversable = less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
+  // normal steiner computation for big enough faces
+  if (traversable) {
     return compute_steiner_point_normal(ch, neighbor, steiner_point);
 
   }
 
-
-  if (!traversible) {
+  // for small faces, use modified steiner point insertion
     Tetrahedron_with_outside_info<Geom_traits> tet(neighbor, geom_traits());
     if(m_oracle.do_intersect(tet))
   {
-  // steiner point is the closest point on input from cell centroid with offset
+  // Find the closest point from neighboring tetrahedron midpoint on input (= inside offset)
+      // In case of concave edge (higher change for small triangles), this has a potential to snap to the concave edge
   const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
   CGAL_assertion(closest_pt != neighbor_cc);
-      Point_3 face_mid(
-        (pts[0].x() + pts[1].x() + pts[2].x()) / 3.0,
-        (pts[0].y() + pts[1].y() + pts[2].y()) / 3.0,
-        (pts[0].z() + pts[1].z() + pts[2].z()) / 3.0);
 
-  // compute midpoints on triangle edges
-  Point_3 edge_mid01 = construct_midpoint(pts[0], pts[1]);
-  Point_3 edge_mid12 = construct_midpoint(pts[1], pts[2]);
-  Point_3 edge_mid20 = construct_midpoint(pts[2], pts[0]);
 
-  // // compute optimal points on each edge
-  // Point_3 p_opt01 = edge_mid01;
-  // Point_3 p_opt12 = edge_mid12;
-  // Point_3 p_opt20 = edge_mid20;
-  //
-  // compute_edge_optimum(pts[0], pts[1], edge_mid01, p_opt01);
-  // compute_edge_optimum(pts[1], pts[2], edge_mid12, p_opt12);
-  // compute_edge_optimum(pts[2], pts[0], edge_mid20, p_opt20);
+      // next try to approximate furthest point on face --> when moving from concave edge to this point, this is a really rough approximation for concave edge on offset surface
+      Point_3 face_pt = furthest_point_on_triangle(pts[0], pts[1], pts[2]); // optimal point on triangle
+      // Point_3 face_pt = mid_pt_of_triangle(pts[0], pts[1], pts[2]); // try just face mid
+      // Point_3 face_pt = ch_cc; // or just use ch_cc
 
-  // closest points on input for the 3 edge midpoints
-  const Point_3 closest_pt01 = m_oracle.closest_point(edge_mid01);
-  const Point_3 closest_pt12 = m_oracle.closest_point(edge_mid12);
-  const Point_3 closest_pt20 = m_oracle.closest_point(edge_mid20);
-
-  // // closest points on input for the 3 optimal edge points
-  // const Point_3 closest_pt_opt01 = m_oracle.closest_point(p_opt01);
-  // const Point_3 closest_pt_opt12 = m_oracle.closest_point(p_opt12);
-  // const Point_3 closest_pt_opt20 = m_oracle.closest_point(p_opt20);
-
-  // squared distances to input for all 6 candidates
-  FT d_mid01_sq = sq_dist(edge_mid01, closest_pt01);
-  FT d_mid12_sq = sq_dist(edge_mid12, closest_pt12);
-  FT d_mid20_sq = sq_dist(edge_mid20, closest_pt20);
-
-  // FT d_opt01_sq = sq_dist(p_opt01, closest_pt_opt01);
-  // FT d_opt12_sq = sq_dist(p_opt12, closest_pt_opt12);
-  // FT d_opt20_sq = sq_dist(p_opt20, closest_pt_opt20);
-
-  // choose the point farthest from the input
-  Point_3 edge_mid = edge_mid01;
-  FT max_d_sq = d_mid01_sq;
-
-  if (d_mid12_sq > max_d_sq) {
-    max_d_sq = d_mid12_sq;
-    edge_mid = edge_mid12;
-  }
-  if (d_mid20_sq > max_d_sq) {
-    max_d_sq = d_mid20_sq;
-    edge_mid = edge_mid20;
-  }
-
-  // if (d_opt01_sq > max_d_sq) {
-  //   max_d_sq = d_opt01_sq;
-  //   face_mid = p_opt01;
-  // }
-  // if (d_opt12_sq > max_d_sq) {
-  //   max_d_sq = d_opt12_sq;
-  //   face_mid = p_opt12;
-  // }
-  // if (d_opt20_sq > max_d_sq) {
-  //   max_d_sq = d_opt20_sq;
-  //   face_mid = p_opt20;
-  // }
-      Vector_3 from_face_mid = vector(face_mid,edge_mid);
-      // std::cout << "=========================================================" << std::endl;
-      // std::cout << "opt point should lay between: face_mid = " << face_mid << " and edge_mid = " << edge_mid << std::endl;
-      face_mid = face_mid + 0.95*from_face_mid;
-      // std::cout << "opt point = " << face_mid << std::endl;
-
-#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
-  std::cout << "edge_mid01 = " << edge_mid01 << ", d^2 = " << d_mid01_sq << std::endl;
-  std::cout << "edge_mid12 = " << edge_mid12 << ", d^2 = " << d_mid12_sq << std::endl;
-  std::cout << "edge_mid20 = " << edge_mid20 << ", d^2 = " << d_mid20_sq << std::endl;
-
-  std::cout << "p_opt01    = " << p_opt01    << ", d^2 = " << d_opt01_sq << std::endl;
-  std::cout << "p_opt12    = " << p_opt12    << ", d^2 = " << d_opt12_sq << std::endl;
-  std::cout << "p_opt20    = " << p_opt20    << ", d^2 = " << d_opt20_sq << std::endl;
-
-  std::cout << "selected face_mid = " << face_mid << ", max d^2 = " << max_d_sq << std::endl;
-#endif
-
-  if(m_oracle.first_intersection(face_mid, closest_pt, steiner_point, m_offset))
+      // if moving from closest point on input (from neighbor_cc) to furthest triangle point, gives an intersection, first intersection is steiner point
+  if(m_oracle.first_intersection(face_pt, closest_pt, steiner_point, m_offset))
   {
-#ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
-    std::cout << "Steiner found through first_intersection(): " << steiner_point << std::endl;
-#endif
     return true;
   }
   }
-  }
+  // if no steiner point is successfully computed, compute it using the normal way
   return compute_steiner_point_normal(ch, neighbor, steiner_point);
+  }
+
+    // modified steiner computation
+  bool compute_steiner_point(const Cell_handle ch,
+                             const Cell_handle neighbor,
+                             Point_3& steiner_point) const
+  {
+    const bool mod_steiner_computation = true;
+
+  // use normal steiner computation
+    if (!mod_steiner_computation) {
+      return compute_steiner_point_normal(ch, neighbor, steiner_point);
+    }
+  // else use modified implementation
+  return compute_steiner_point_modified(ch, neighbor, steiner_point);
   }
 
 private:
