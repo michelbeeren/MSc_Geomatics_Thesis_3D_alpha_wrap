@@ -4,6 +4,8 @@
 
 #include <string>
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <fstream>
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
@@ -165,10 +167,12 @@ std::string generate_output_name(const std::string input_name_, const double rel
     return out_name;
 }
 
+
 // 3D alpha wrap
-Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool MAT, bool Octree, bool write_out_, bool validate, bool hausdorff) {
+Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool max_d_in_offets, bool MAT, bool Octree, bool write_out_, bool validate, bool hausdorff) {
     // get mesh from input data
     Mesh& mesh_ = data_.mesh;
+    double max_d_to_input_in_offsets_ = 3;
 
     // compute alpha and offset from a_rel and d_rel and bbox
     CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh_);
@@ -260,11 +264,19 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
 
         std::cout << "Step 3: Running Alpha Wrap with Octree..." << std::endl;
         CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::octree(finest_cubes));
+
     }
     if ((!Octree && !MAT) || (Octree && MAT)) {
         // Default: call alpha_wrap_3 without MAT or Octree
-        std::cout << "..........Running normal alpha wrap algorithm.........." << std::endl;
-        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::max_distance_to_input_in_offsets(3.5));
+
+        if (max_d_in_offets) {
+            std::cout << "..........Running alpha wrap algorithm with other refinement rule and steiner point placement.........." << std::endl;
+            CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::max_distance_to_input_in_offsets(max_d_to_input_in_offsets_));
+        }
+        if (!max_d_in_offets) {
+            std::cout << "..........Running normal alpha wrap algorithm.........." << std::endl;
+            CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap);
+        }
     }
 
     t.stop();
@@ -287,6 +299,18 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
                 output_ = output_.substr(0, output_.size() - 4);
             }
             output_ += "_Octree.off";
+        }
+        if (max_d_in_offets) {
+            if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
+                output_ = output_.substr(0, output_.size() - 4);
+            }
+            std::ostringstream oss;
+            if (max_d_to_input_in_offsets_ <= 1) {
+                max_d_to_input_in_offsets_ = 1.5;
+            }
+            oss << std::fixed << std::setprecision(1) << max_d_to_input_in_offsets_;
+            const std::string refined = oss.str();
+            output_ += "_refined=" + refined + ".off";
         }
         std::cout << "📝 Writing 📝 to: " << output_ << std::endl;
         CGAL::IO::write_polygon_mesh(output_, wrap, CGAL::parameters::stream_precision(25));

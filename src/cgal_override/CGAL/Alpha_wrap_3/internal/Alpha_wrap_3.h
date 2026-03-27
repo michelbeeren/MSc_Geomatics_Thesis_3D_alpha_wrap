@@ -196,6 +196,7 @@ protected:
 
   // Default parameter: factor relative to offset
   double m_max_distance_to_input_in_offsets = 1.5;
+  bool m_check_face_distance_from_input = false;
 
   FT m_alpha = FT(-1), m_sq_alpha = FT(-1);
   FT m_offset = FT(-1), m_sq_offset = FT(-1);
@@ -300,9 +301,9 @@ public:
     m_max_distance_to_input_in_offsets = factor;
   }
 
-  double max_distance_to_input_in_offsets() const
+  void set_check_face_distance_from_input(const bool b)
   {
-    return m_max_distance_to_input_in_offsets;
+    m_check_face_distance_from_input = b;
   }
 
 
@@ -1086,8 +1087,7 @@ bool too_far_from_input(const Facet& f) const {
   // function to check if a face is traversible
 bool is_traversable(const Facet& f) const
 {
-  // ToDo implement too_far_from_input as parameter --> if (check_face_distance_to_input) {do this next part} also for next parts
-  bool check_face_distance_from_input = true;
+  bool check_face_distance_from_input = m_check_face_distance_from_input; // check face distance from input if max_distance_to_input_in_offsets is provided
   // A) Default CGAL behavior: when neither MAT nor Octree is used
   if ((!m_use_mat || !m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr))
   {
@@ -1465,7 +1465,7 @@ bool is_traversable(const Facet& f) const
                              const Cell_handle neighbor,
                              Point_3& steiner_point) const
   {
-    const bool mod_steiner_computation = true;
+    const bool mod_steiner_computation = m_check_face_distance_from_input; // only use modified steiner point placement if parameter max_distance_to_input_in_offsets is used
 
   // use normal steiner computation
     if (!mod_steiner_computation) {

@@ -28,22 +28,6 @@ using Primitive   = CGAL::AABB_face_graph_triangle_primitive<Mesh>;
 using AABB_traits = CGAL::AABB_traits<K, Primitive>;
 using Tree        = CGAL::AABB_tree<AABB_traits>;
 
-// ============================= STRUCTS ===================================
-// struct OctreeCell {
-//     CGAL::Bbox_3 bbox;
-//     int depth = 0;
-//     std::vector<Mesh::Face_index> faces;
-//     std::array<std::unique_ptr<OctreeCell>, 8> children;
-//
-//     OctreeCell() {
-//         for (auto& c : children)
-//             c = nullptr;
-//     }
-// };
-// struct LeafCell {
-//     CGAL::Bbox_3 bbox;
-// };
-
 // ====================== OWN CREATED HEADERS ==============================
 #include "val3dity.h"
 #include "alpha_wrap.h"
@@ -58,12 +42,12 @@ using Tree        = CGAL::AABB_tree<AABB_traits>;
 int main(int argc, char** argv)
 {
   // Read the input
-  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Input/3DBAG_Buildings/Joep_huis.off");
+  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Input/point_cloud/tree.off");
     std::cout << "------------------------------------------------------------" << std::endl;
   std::cout << "Reading input: " << filename << std::endl;
 
-  const double relative_alpha = 10; //2000. //20. //1000.
-  const double relative_offset = 1000.; // 7000. //600. //12000.
+  const double relative_alpha = 40; //2000. //20. //1000.
+  const double relative_offset = 500.; // 7000. //600. //12000.
 
     // ----------------------MESH INPUT FILE (optional: compute normals and tree)------------------
     auto data = mesh_input(filename, true, true); // set both to false if you do not want to compute normals + tree
@@ -78,7 +62,7 @@ int main(int argc, char** argv)
 
 
     // ------------------------------ALPHA WRAP INPUT---------------------------------------
-    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, data, false, false, true, true, false); // set both to false if you do not want to write out the file and test if valid
+    Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, data, false, false, false, true, true, false); // set both to false if you do not want to write out the file and test if valid
     std::vector<Point_3> samples = _surface_sampling(mesh, 200.0);
     std::vector<double> distances = point_to_mesh_distances(samples, alpha_wrap);
     std::cout << "distances.size() = " << distances.size() << std::endl;

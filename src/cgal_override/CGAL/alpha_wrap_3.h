@@ -158,38 +158,35 @@ void alpha_wrap_3(const PointRange& points,
     }
 
     constexpr double default_max_distance_to_input_in_offsets = 1.5; // default max_distance_to_input_in_offsets
-    const bool max_dist_missing =
-    is_default_parameter<InputNamedParameters,
-                         internal_np::max_distance_to_input_in_offsets_t>::value;
+        const bool max_dist_param_used =
+          !is_default_parameter<InputNamedParameters,
+                                internal_np::max_distance_to_input_in_offsets_t>::value;
 
-    double max_dist_factor =
-      choose_parameter(
-        get_parameter(in_np, internal_np::max_distance_to_input_in_offsets),
-        default_max_distance_to_input_in_offsets
-      );
+        double max_dist_factor = default_max_distance_to_input_in_offsets;
 
-    if(max_dist_missing)
-    {
-        std::cerr
-          << "[CGAL::alpha_wrap_3] Named parameter "
-          << "`max_distance_to_input_in_offsets` not provided. "
-          << "Using default value 1.5.\n";
+        if(max_dist_param_used)
+        {
+            max_dist_factor =
+              choose_parameter(
+                get_parameter(in_np, internal_np::max_distance_to_input_in_offsets),
+                default_max_distance_to_input_in_offsets
+              );
 
-        max_dist_factor = default_max_distance_to_input_in_offsets;
-    }
-    else if(max_dist_factor <= 1.0)
-    {
-        std::cerr
-          << "[CGAL::alpha_wrap_3] Named parameter "
-          << "`max_distance_to_input_in_offsets` = " << max_dist_factor
-          << " is invalid (must be > 1.0). "
-          << "Using default value 1.5.\n";
+            if(max_dist_factor <= 1.0)
+            {
+                std::cerr
+                  << "[CGAL::alpha_wrap_3] Named parameter "
+                  << "`max_distance_to_input_in_offsets` = " << max_dist_factor
+                  << " is invalid (must be > 1.0). "
+                  << "Using default value 1.5.\n";
 
-        max_dist_factor = default_max_distance_to_input_in_offsets;
-    }
+                max_dist_factor = default_max_distance_to_input_in_offsets;
+            }
 
-    alpha_wrap_builder.set_max_distance_to_input_in_offsets(max_dist_factor);
+            alpha_wrap_builder.set_max_distance_to_input_in_offsets(max_dist_factor);
+        }
 
+        alpha_wrap_builder.set_check_face_distance_from_input(max_dist_param_used);
   alpha_wrap_builder(alpha, offset, alpha_wrap, in_np, out_np);
 }
 
@@ -352,37 +349,35 @@ void alpha_wrap_3(const TriangleMesh& tmesh,
     }
 
     constexpr double default_max_distance_to_input_in_offsets = 1.5; // default max_distance_to_input_in_offsets
-    const bool max_dist_missing =
-    is_default_parameter<InputNamedParameters,
-                         internal_np::max_distance_to_input_in_offsets_t>::value;
+        const bool max_dist_param_used =
+          !is_default_parameter<InputNamedParameters,
+                                internal_np::max_distance_to_input_in_offsets_t>::value;
 
-    double max_dist_factor =
-      choose_parameter(
-        get_parameter(in_np, internal_np::max_distance_to_input_in_offsets),
-        default_max_distance_to_input_in_offsets
-      );
+        double max_dist_factor = default_max_distance_to_input_in_offsets;
 
-    if(max_dist_missing)
-    {
-        std::cerr
-          << "[CGAL::alpha_wrap_3] Named parameter "
-          << "`max_distance_to_input_in_offsets` not provided. "
-          << "Using default value 1.5.\n";
+        if(max_dist_param_used)
+        {
+            max_dist_factor =
+              choose_parameter(
+                get_parameter(in_np, internal_np::max_distance_to_input_in_offsets),
+                default_max_distance_to_input_in_offsets
+              );
 
-        max_dist_factor = default_max_distance_to_input_in_offsets;
-    }
-    else if(max_dist_factor <= 1.0)
-    {
-        std::cerr
-          << "[CGAL::alpha_wrap_3] Named parameter "
-          << "`max_distance_to_input_in_offsets` = " << max_dist_factor
-          << " is invalid (must be > 1.0). "
-          << "Using default value 1.5.\n";
+            if(max_dist_factor <= 1.0)
+            {
+                std::cerr
+                  << "[CGAL::alpha_wrap_3] Named parameter "
+                  << "`max_distance_to_input_in_offsets` = " << max_dist_factor
+                  << " is invalid (must be > 1.0). "
+                  << "Using default value 1.5.\n";
 
-        max_dist_factor = default_max_distance_to_input_in_offsets;
-    }
+                max_dist_factor = default_max_distance_to_input_in_offsets;
+            }
 
-    alpha_wrap_builder.set_max_distance_to_input_in_offsets(max_dist_factor);
+            alpha_wrap_builder.set_max_distance_to_input_in_offsets(max_dist_factor);
+        }
+
+        alpha_wrap_builder.set_check_face_distance_from_input(max_dist_param_used);
 
   alpha_wrap_builder(alpha, offset, alpha_wrap, in_np, out_np);
 }
@@ -493,37 +488,35 @@ void alpha_wrap_3(const PointRange& points,
     }
 
     constexpr double default_max_distance_to_input_in_offsets = 1.5; // default max_distance_to_input_in_offsets
-    const bool max_dist_missing =
-    is_default_parameter<InputNamedParameters,
-                         internal_np::max_distance_to_input_in_offsets_t>::value;
+        const bool max_dist_param_used =
+          !is_default_parameter<InputNamedParameters,
+                                internal_np::max_distance_to_input_in_offsets_t>::value;
 
-    double max_dist_factor =
-      choose_parameter(
-        get_parameter(in_np, internal_np::max_distance_to_input_in_offsets),
-        default_max_distance_to_input_in_offsets
-      );
+        double max_dist_factor = default_max_distance_to_input_in_offsets;
 
-    if(max_dist_missing)
-    {
-        std::cerr
-          << "[CGAL::alpha_wrap_3] Named parameter "
-          << "`max_distance_to_input_in_offsets` not provided. "
-          << "Using default value 1.5.\n";
+        if(max_dist_param_used)
+        {
+            max_dist_factor =
+              choose_parameter(
+                get_parameter(in_np, internal_np::max_distance_to_input_in_offsets),
+                default_max_distance_to_input_in_offsets
+              );
 
-        max_dist_factor = default_max_distance_to_input_in_offsets;
-    }
-    else if(max_dist_factor <= 1.0)
-    {
-        std::cerr
-          << "[CGAL::alpha_wrap_3] Named parameter "
-          << "`max_distance_to_input_in_offsets` = " << max_dist_factor
-          << " is invalid (must be > 1.0). "
-          << "Using default value 1.5.\n";
+            if(max_dist_factor <= 1.0)
+            {
+                std::cerr
+                  << "[CGAL::alpha_wrap_3] Named parameter "
+                  << "`max_distance_to_input_in_offsets` = " << max_dist_factor
+                  << " is invalid (must be > 1.0). "
+                  << "Using default value 1.5.\n";
 
-        max_dist_factor = default_max_distance_to_input_in_offsets;
-    }
+                max_dist_factor = default_max_distance_to_input_in_offsets;
+            }
 
-    alpha_wrap_builder.set_max_distance_to_input_in_offsets(max_dist_factor);
+            alpha_wrap_builder.set_max_distance_to_input_in_offsets(max_dist_factor);
+        }
+
+        alpha_wrap_builder.set_check_face_distance_from_input(max_dist_param_used);
 
   alpha_wrap_builder(alpha, offset, alpha_wrap, in_np, out_np);
 }
