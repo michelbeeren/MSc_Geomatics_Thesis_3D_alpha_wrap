@@ -1454,7 +1454,7 @@ bool is_traversable(const Facet& f) const
                              const Cell_handle neighbor,
                              Point_3& steiner_point) const
   {
-    const bool mod_steiner_computation = true;
+    const bool mod_steiner_computation = false;
 
   // use normal steiner computation
     if (!mod_steiner_computation) {
