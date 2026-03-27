@@ -264,7 +264,7 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
     if ((!Octree && !MAT) || (Octree && MAT)) {
         // Default: call alpha_wrap_3 without MAT or Octree
         std::cout << "..........Running normal alpha wrap algorithm.........." << std::endl;
-        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap);
+        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::max_distance_to_input_in_offsets(3.5));
     }
 
     t.stop();

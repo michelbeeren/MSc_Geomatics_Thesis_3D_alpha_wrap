@@ -189,11 +189,13 @@ protected:
   std::string m_mat_path;
   mutable std::unique_ptr<CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>> m_fs_mat_ptr;
 
-
   // Octree support (optional)
   bool m_use_octree = false;
   std::vector<CGAL::Bbox_3> m_cells;  // New member to store the octree path
   mutable std::unique_ptr<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>> m_octree_ptr;
+
+  // Default parameter: factor relative to offset
+  double m_max_distance_to_input_in_offsets = 1.5;
 
   FT m_alpha = FT(-1), m_sq_alpha = FT(-1);
   FT m_offset = FT(-1), m_sq_offset = FT(-1);
@@ -293,6 +295,15 @@ public:
     }
   }
 
+  void set_max_distance_to_input_in_offsets(const double factor)
+  {
+    m_max_distance_to_input_in_offsets = factor;
+  }
+
+  double max_distance_to_input_in_offsets() const
+  {
+    return m_max_distance_to_input_in_offsets;
+  }
 
 
   template <typename OutputMesh,
@@ -1056,14 +1067,14 @@ bool too_far_from_input(const Facet& f) const {
   const Point_3 f_mid = mid_pt_of_triangle(p0, p1, p2);
 
   // ---- 3. Distance to input surface via Oracle ----
-  const Point_3 closest_pt = m_oracle.closest_point(f_mid); // ToDo how is closest point actually computed?
+  const Point_3 closest_pt = m_oracle.closest_point(f_mid);
 
   const FT sq_d = geom_traits().compute_squared_distance_3_object()(f_mid, closest_pt);
 
   const double dist_input = std::sqrt(CGAL::to_double(sq_d));
 
   // max distance a triangle midpoint may be from the input
-  const double tolerance = 1.2 * m_offset; // ToDo should be parameter, also with safe threshold of e.g. 1.1
+  const double tolerance = m_max_distance_to_input_in_offsets * m_offset; // ToDo should be parameter, also with safe threshold of e.g. 1.1
 
   if (dist_input > tolerance) {
      // if distance of triangle midpoint to input is larger than threshold, return that face is traversable
@@ -1454,7 +1465,7 @@ bool is_traversable(const Facet& f) const
                              const Cell_handle neighbor,
                              Point_3& steiner_point) const
   {
-    const bool mod_steiner_computation = false;
+    const bool mod_steiner_computation = true;
 
   // use normal steiner computation
     if (!mod_steiner_computation) {
