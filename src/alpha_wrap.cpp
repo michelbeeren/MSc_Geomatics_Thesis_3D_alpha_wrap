@@ -23,6 +23,7 @@
 #include <CGAL/IO/Color.h>
 #include <filesystem>
 #include <CGAL/Polyhedron_3.h>
+#include <CGAL/IO/read_points.h>
 // #include <CGAL/Polyhedron_traits_3.h> // Uncomment if needed, but this is often not required for basic operations
 #include <filesystem>
 
@@ -30,7 +31,7 @@ namespace PMP = CGAL::Polygon_mesh_processing;
 using K = CGAL::Exact_predicates_inexact_constructions_kernel;
 using Point_3 = K::Point_3;
 using Mesh = CGAL::Surface_mesh<Point_3>;
-using Point_3 = K::Point_3;
+using Point_container = std::vector<Point_3>;
 using Vector_3 = K::Vector_3;
 using Segment_3 = K::Segment_3;
 using Primitive   = CGAL::AABB_face_graph_triangle_primitive<Mesh>;
@@ -59,41 +60,6 @@ std::map<Mesh::Face_index, std::set<Mesh::Face_index>> create_adjacency_map(cons
     }
     return adjacency_map;
 }
-// std::map<Mesh::Face_index, std::set<Mesh::Face_index>> create_adjacency_map(const Mesh& mesh) {
-//     std::map<Mesh::Face_index, std::set<Mesh::Face_index>> adjacency_map;
-//
-//     // Iterate over all faces in the mesh
-//     for (auto f : mesh.faces()) {
-//         Mesh::Face_index current_face = f;
-//
-//         // Get the edges of the current face
-//         std::set<std::pair<Mesh::Vertex_index, Mesh::Vertex_index>> edges;
-//         auto he = mesh.halfedges_around_face(mesh.halfedge(current_face));
-//         for (auto h : he) {
-//             auto v1 = mesh.source(h);
-//             auto v2 = mesh.target(h);
-//             if (v1 > v2) std::swap(v1, v2);  // Ensure consistent ordering
-//             edges.insert({v1, v2});
-//         }
-//
-//         // For each edge of the current face, check if any other face shares that edge
-//         for (auto edge : edges) {
-//             // Get the halfedge corresponding to this edge
-//             auto halfedge = mesh.halfedge(edge.first, edge.second);
-//             auto opp_h = mesh.opposite(halfedge); // Get the other side of the edge
-//             auto opposite_face = mesh.face(opp_h); // This is the actual neighbor
-//
-//             // If the opposite face exists and is different, add it to the adjacency map
-//             if (opposite_face != Mesh::null_face()) {
-//                 adjacency_map[current_face].insert(opposite_face);
-//                 adjacency_map[opposite_face].insert(current_face);  // Bidirectional adjacency
-//             }
-//         }
-//     }
-//
-//
-//     return adjacency_map;
-// }
 
 // --------------------------------------MESH INPUT-------------------------------------
 MeshData mesh_input(const std::string& filename, bool compute_normals, bool build_tree)
@@ -136,7 +102,42 @@ MeshData mesh_input(const std::string& filename, bool compute_normals, bool buil
     return out;
 }
 
+Point_container point_input(const std::string& filename)
+{
+    Point_container points;
 
+    if(!CGAL::IO::read_points(filename, std::back_inserter(points)) || points.empty())
+    {
+        throw std::runtime_error("Failed to read point cloud: " + filename);
+    }
+
+    std::cout << "Input: " << points.size() << " points" << std::endl;
+    return points;
+}
+
+Input_kind detect_input_kind(const std::string& filename)
+{
+    {
+        Mesh mesh;
+        if(PMP::IO::read_polygon_mesh(filename, mesh) &&
+           !CGAL::is_empty(mesh) &&
+           CGAL::is_triangle_mesh(mesh))
+        {
+            return Input_kind::Triangle_mesh;
+        }
+    }
+
+    {
+        Point_container points;
+        if(CGAL::IO::read_points(filename, std::back_inserter(points)) &&
+           !points.empty())
+        {
+            return Input_kind::Point_cloud;
+        }
+    }
+
+    return Input_kind::Unknown;
+}
 
 // --------------------------------------ALPHA WRAP-------------------------------------
 // generate output name
@@ -169,10 +170,10 @@ std::string generate_output_name(const std::string input_name_, const double rel
 
 
 // 3D alpha wrap
-Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool max_d_in_offets, bool MAT, bool Octree, bool write_out_, bool validate, bool hausdorff) {
+Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool max_d_in_offets, const double max_d, bool MAT, bool Octree, bool write_out_, bool validate, bool hausdorff) {
     // get mesh from input data
     Mesh& mesh_ = data_.mesh;
-    double max_d_to_input_in_offsets_ = 3;
+    double max_d_to_input_in_offsets_ = max_d;
 
     // compute alpha and offset from a_rel and d_rel and bbox
     CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh_);
@@ -329,6 +330,134 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
         write_hausdorff_distance(wrap, output_);  // Now save to PLY
     }
 
+    return wrap;
+}
+
+Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool max_d_in_offets, const double max_d, bool write_out_, bool validate) {
+    Mesh& mesh_ = data_.mesh;
+    double max_d_to_input_in_offsets_ = max_d;
+
+    // compute alpha and offset from a_rel and d_rel and bbox
+    CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh_);
+    const double diag_length = std::sqrt(CGAL::square(bbox.xmax() - bbox.xmin()) +
+                                         CGAL::square(bbox.ymax() - bbox.ymin()) +
+                                         CGAL::square(bbox.zmax() - bbox.zmin()));
+    const double alpha = diag_length / relative_alpha_;
+    const double offset = diag_length / relative_offset_;
+    std::cout << "--------------------3D ALPHA WRAPPING THE INPUT:----------------" << std::endl;
+    std::cout << "alpha = " << alpha << " (a_rel = " << relative_alpha_ << ") and offset = " << offset << " (offset_rel = " << relative_offset_ << ")" << std::endl;
+
+    // Construct the wrap
+    CGAL::Real_timer t;
+    t.start();
+
+    Mesh wrap;
+    if (max_d_in_offets) {
+        std::cout << "..........Running alpha wrap algorithm with other refinement rule and steiner point placement.........." << std::endl;
+        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::max_distance_to_input_in_offsets(max_d_to_input_in_offsets_));
+    }
+    if (!max_d_in_offets) {
+        std::cout << "..........Running normal alpha wrap algorithm.........." << std::endl;
+        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap);
+    }
+    t.stop();
+    std::cout << "🎁 Successfully alpha wrapped! 🎁: " << num_vertices(wrap) << " 🔘vertices🔘, " << num_faces(wrap) << " 📐faces📐, it took " << t.time() << " s.⏰" << std::endl;
+
+    std::string output_ = generate_output_name(filename, relative_alpha_, relative_offset_);
+    // Write the output mesh
+    if (write_out_) {
+        std::filesystem::path p(output_);
+        std::filesystem::create_directory(p.parent_path());
+        if (max_d_in_offets) {
+            if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
+                output_ = output_.substr(0, output_.size() - 4);
+            }
+            std::ostringstream oss;
+            if (max_d_to_input_in_offsets_ <= 1) {
+                max_d_to_input_in_offsets_ = 1.5;
+            }
+            oss << std::fixed << std::setprecision(1) << max_d_to_input_in_offsets_;
+            const std::string refined = oss.str();
+            output_ += "_refined=" + refined + ".off";
+        }
+        std::cout << "📝 Writing 📝 to: " << output_ << std::endl;
+        CGAL::IO::write_polygon_mesh(output_, wrap, CGAL::parameters::stream_precision(25));
+    }
+
+    // ----------------------------- validate the output ------------------------------
+    if (validate) {
+        valid_mesh_boolean(wrap);
+    }
+    std::cout << "---------------------------------------------------------------" << std::endl;
+    return wrap;
+}
+
+Mesh _3D_alpha_wrap_pc(const std::string filename, const double relative_alpha_, const double relative_offset_, bool max_d_in_offets, const double max_d, bool write_out_, bool validate) {
+    double max_d_to_input_in_offsets_ = max_d;
+
+    Point_container points_;
+    if(!CGAL::IO::read_points(filename, std::back_inserter(points_)) || points_.empty())
+    {
+        std::cerr << "Invalid input: " << filename << std::endl;
+    }
+
+    if (points_.empty())
+    {
+        throw std::runtime_error("Point cloud is empty.");
+    }
+
+    // compute alpha and offset from a_rel and d_rel and bbox
+    CGAL::Bbox_3 bbox = CGAL::bbox_3(points_.begin(), points_.end());
+    const double diag_length = std::sqrt(CGAL::square(bbox.xmax() - bbox.xmin()) +
+                                         CGAL::square(bbox.ymax() - bbox.ymin()) +
+                                         CGAL::square(bbox.zmax() - bbox.zmin()));
+    const double alpha = diag_length / relative_alpha_;
+    const double offset = diag_length / relative_offset_;
+    std::cout << "--------------------3D ALPHA WRAPPING THE INPUT:----------------" << std::endl;
+    std::cout << "alpha = " << alpha << " (a_rel = " << relative_alpha_ << ") and offset = " << offset << " (offset_rel = " << relative_offset_ << ")" << std::endl;
+
+    // Construct the wrap
+    CGAL::Real_timer t;
+    t.start();
+
+    Mesh wrap;
+    if (max_d_in_offets) {
+        std::cout << "..........Running alpha wrap algorithm with other refinement rule and steiner point placement.........." << std::endl;
+        CGAL::alpha_wrap_3(points_, alpha, offset, wrap, CGAL::parameters::max_distance_to_input_in_offsets(max_d_to_input_in_offsets_));
+    }
+    if (!max_d_in_offets) {
+        std::cout << "..........Running normal alpha wrap algorithm.........." << std::endl;
+        CGAL::alpha_wrap_3(points_, alpha, offset, wrap);
+    }
+    t.stop();
+    std::cout << "🎁 Successfully alpha wrapped! 🎁: " << num_vertices(wrap) << " 🔘vertices🔘, " << num_faces(wrap) << " 📐faces📐, it took " << t.time() << " s.⏰" << std::endl;
+
+    std::string output_ = generate_output_name(filename, relative_alpha_, relative_offset_);
+    // Write the output mesh
+    if (write_out_) {
+        std::filesystem::path p(output_);
+        std::filesystem::create_directory(p.parent_path());
+        if (max_d_in_offets) {
+            if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
+                output_ = output_.substr(0, output_.size() - 4);
+            }
+            std::ostringstream oss;
+            if (max_d_to_input_in_offsets_ <= 1) {
+                max_d_to_input_in_offsets_ = 1.5;
+            }
+            oss << std::fixed << std::setprecision(1) << max_d_to_input_in_offsets_;
+            const std::string refined = oss.str();
+            output_ += "_refined=" + refined + ".off";
+        }
+        std::cout << "📝 Writing 📝 to: " << output_ << std::endl;
+        CGAL::IO::write_polygon_mesh(output_, wrap, CGAL::parameters::stream_precision(25));
+    }
+
+    // ----------------------------- validate the output ------------------------------
+    if (validate) {
+        valid_mesh_boolean(wrap);
+    }
+    std::cout << "---------------------------------------------------------------" << std::endl;
     return wrap;
 }
 
