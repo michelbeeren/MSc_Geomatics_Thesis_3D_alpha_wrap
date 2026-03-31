@@ -1482,19 +1482,21 @@ private:
     IRRELEVANT = 0,
     HAS_INFINITE_NEIGHBOR, // the cell incident to the mirrored facet is infinite (permissive)
     SCAFFOLDING, // incident to a SEED or BBOX vertex (permissive)
-    TRAVERSABLE
+    TRAVERSABLE,
+    IS_ZOMBIE_CELL, // with new traversability rules --> empty labeled inside cells may exist at the boundary, ensure these zombie cells still get flood filled
   };
 
   inline const char* get_status_message(const Facet_status status)
   {
-    constexpr std::size_t status_count = 4;
+    constexpr std::size_t status_count = 5;
 
     // Messages corresponding to Error_code list above. Must be kept in sync!
     static const char* message[status_count] = {
       "Irrelevant facet",
       "Facet incident to infinite neighbor",
       "Facet with a bbox/seed vertex",
-      "Traversable facet"
+      "Traversable facet",
+      "Zombie facet"
     };
 
     const std::size_t status_id = static_cast<std::size_t>(status);
@@ -1502,6 +1504,30 @@ private:
       return "Unknown status";
     else
       return message[status_id];
+  }
+
+  bool is_empty_cell(const Cell_handle ch) const // helper to see if a cell is empty or not
+{
+    CGAL_precondition(!m_tr.is_infinite(ch));
+    const Tetrahedron_with_outside_info<Geom_traits> tet(ch, geom_traits());
+    return !m_oracle.do_intersect(tet);
+}
+
+  void carve_through_gate(const Cell_handle ch,
+                        const int s,
+                        const Cell_handle nh)
+  {
+    nh->set_label(Cell_label::OUTSIDE);
+#ifndef CGAL_AW3_USE_SORTED_PRIORITY_QUEUE
+    nh->increment_erase_counter();
+#endif
+
+    const int mi = m_tr.mirror_index(ch, s);
+    for(int i=1; i<4; ++i)
+    {
+      const Facet neighbor_f = std::make_pair(nh, (mi + i) & 3);
+      push_facet(neighbor_f);
+    }
   }
 
 public:
@@ -1568,6 +1594,12 @@ public:
       return Facet_status::TRAVERSABLE;
     }
 
+    if (!is_traversable(f) && is_empty_cell(nh)) {
+        // std::cout << "🧟🧟🧟face is NOT traversable, but neighbor cell IS empty!🧟🧟🧟" << std::endl;
+        return Facet_status::IS_ZOMBIE_CELL;
+      }
+        // std::cout << "👼🏼👼🏼👼🏼face is NOT traversable, and neighbor cell contains input!👼🏼👼🏼👼🏼" << std::endl;
+
 #ifdef CGAL_AW3_DEBUG_FACET_STATUS
     std::cout << "not traversable" << std::endl;
 #endif
@@ -1595,7 +1627,8 @@ private:
 #ifdef CGAL_AW3_USE_SORTED_PRIORITY_QUEUE
     const FT sqr = smallest_squared_radius_3(f, m_tr);
     const bool is_permissive = (status == Facet_status::HAS_INFINITE_NEIGHBOR ||
-                                status == Facet_status::SCAFFOLDING);
+                                status == Facet_status::SCAFFOLDING ||
+                                status == Facet_status::IS_ZOMBIE_CELL);
     m_queue.resize_and_push(Gate(f, sqr, is_permissive));
 #else
     m_queue.push(Gate(f, m_tr));
@@ -1709,7 +1742,6 @@ private:
 
   template <typename Visitor>
 
-// ooh found the alpha flood fill function :)
   // this function starts after initialisation
   //    -> builds/updates 3D triangulation
   //    -> computes offset surface
@@ -1793,6 +1825,12 @@ private:
 
       m_queue.pop();
 
+      // Recompute the status now that the queue entry is being processed.
+      // This avoids acting on facets that became stale after previous updates.
+      const Facet_status status = facet_status(f);
+      if(status == Facet_status::IRRELEVANT)
+        continue;
+
       // Infinite cells per definition OUTSIDE
       if(m_tr.is_infinite(nh))
       {
@@ -1800,6 +1838,17 @@ private:
 #ifndef CGAL_AW3_USE_SORTED_PRIORITY_QUEUE
         nh->increment_erase_counter();
 #endif
+        continue;
+      }
+
+      // Special rule for trapped empty neighbor cells:
+      // carve them directly, never refine them.
+      if(status == Facet_status::IS_ZOMBIE_CELL)
+      {
+#ifdef CGAL_AW3_DEBUG_QUEUE
+        std::cout << "Carving zombie facet directly (no Steiner insertion)" << std::endl;
+#endif
+        carve_through_gate(ch, s, nh);
         continue;
       }
 

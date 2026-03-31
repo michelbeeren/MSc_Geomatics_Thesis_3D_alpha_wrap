@@ -47,7 +47,7 @@ int main(int argc, char** argv)
   std::cout << "Reading input: " << filename << std::endl;
 
   const double relative_alpha = 20; //2000. //20. //1000.
-  const double relative_offset = 6000.; // 7000. //600. //12000.
+  const double relative_offset = 2000.; // 7000. //600. //12000.
 
   bool beeren_method = true;
   const double max_d_to_input_in_offsets_ = 1.5;

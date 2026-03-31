@@ -163,6 +163,11 @@ std::string generate_output_name(const std::string input_name_, const double rel
         out_path = out_path.substr(0, out_path.size() - 4);
     }
 
+    // Remove last 4 characters (".off")
+    if (out_path.size() > 4 && out_path.substr(out_path.size() - 4) == ".obj") {
+        out_path = out_path.substr(0, out_path.size() - 4);
+    }
+
     // Add cuurent alpha and offset to the output name
     std::string out_name = out_path + "_a=" + rel_alpha_txt + "_offset=" + rel_offset_txt + ".off";
     return out_name;
@@ -288,7 +293,7 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
     // Write the output mesh
     if (write_out_) {
         std::filesystem::path p(output_);
-        std::filesystem::create_directory(p.parent_path());
+        std::filesystem::create_directories(p.parent_path());
         if (MAT && !Octree) {
             if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
                 output_ = output_.substr(0, output_.size() - 4);
@@ -367,7 +372,7 @@ Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_al
     // Write the output mesh
     if (write_out_) {
         std::filesystem::path p(output_);
-        std::filesystem::create_directory(p.parent_path());
+        std::filesystem::create_directories(p.parent_path());
         if (max_d_in_offets) {
             if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
                 output_ = output_.substr(0, output_.size() - 4);
@@ -436,7 +441,7 @@ Mesh _3D_alpha_wrap_pc(const std::string filename, const double relative_alpha_,
     // Write the output mesh
     if (write_out_) {
         std::filesystem::path p(output_);
-        std::filesystem::create_directory(p.parent_path());
+        std::filesystem::create_directories(p.parent_path());
         if (max_d_in_offets) {
             if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
                 output_ = output_.substr(0, output_.size() - 4);
