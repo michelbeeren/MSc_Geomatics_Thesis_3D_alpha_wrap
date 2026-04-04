@@ -1632,47 +1632,165 @@ bool is_traversable(const Facet& f) const
               bisec_dir = w1_unit;
             }
 
-            // Intersect line L(t)=closest_pt + t*bisec_dir with plane of face f
-            const Vector_3 f01 = vector(pts[0], pts[1]);
-            const Vector_3 f02 = vector(pts[0], pts[2]);
-            const Vector_3 nf = cross(f01, f02);
-
-            const FT denom = dot(bisec_dir, nf);
-            if(CGAL::abs(CGAL::to_double(denom)) > 1e-12)
-            {
-              const FT t = dot(vector(closest_pt, pts[0]), nf) / denom;
-              const Point_3 X = translate(closest_pt, scale(bisec_dir, t));
-
-              // inside-triangle test on face f by barycentric coordinates
-              const Vector_3 a = f01;
-              const Vector_3 b = f02;
-              const Vector_3 c = vector(pts[0], X);
-
-              const FT aa = dot(a, a);
-              const FT ab = dot(a, b);
-              const FT bb = dot(b, b);
-              const FT ac = dot(a, c);
-              const FT bc = dot(b, c);
-              const FT delta = aa * bb - ab * ab;
-
-              if(CGAL::abs(CGAL::to_double(delta)) > 1e-16)
+            auto line_triangle_intersection =
+              [&](const Point_3& p0, const Point_3& p1, const Point_3& p2,
+                  Point_3& X_out, FT& t_out) -> bool
               {
+                const Vector_3 a = vector(p0, p1);
+                const Vector_3 b = vector(p0, p2);
+                const Vector_3 n = cross(a, b);
+
+                const FT denom = dot(bisec_dir, n);
+                if(CGAL::abs(CGAL::to_double(denom)) <= 1e-12)
+                  return false; // line nearly parallel to triangle plane
+
+                const FT t_hit = dot(vector(closest_pt, p0), n) / denom;
+                const Point_3 X = translate(closest_pt, scale(bisec_dir, t_hit));
+
+                const Vector_3 c = vector(p0, X);
+                const FT aa = dot(a, a);
+                const FT ab = dot(a, b);
+                const FT bb = dot(b, b);
+                const FT ac = dot(a, c);
+                const FT bc = dot(b, c);
+                const FT delta = aa * bb - ab * ab;
+
+                if(CGAL::abs(CGAL::to_double(delta)) <= 1e-16)
+                  return false; // degenerate triangle
+
                 const FT u = (bb * ac - ab * bc) / delta;
                 const FT v = (aa * bc - ab * ac) / delta;
                 const FT eps = FT(1e-10);
                 const bool inside = (u >= -eps && v >= -eps && (u + v) <= FT(1) + eps);
+                if(!inside)
+                  return false;
 
-                if(inside)
+                X_out = X;
+                t_out = t_hit;
+                return true;
+              };
+
+            // 1) First try face f itself
+            FT t_face = FT(0);
+            has_bisector_face_intersection =
+              line_triangle_intersection(pts[0], pts[1], pts[2], bisector_face_intersection, t_face);
+            if(has_bisector_face_intersection)
+            {
+              std::cout << "[bisector] intersection found on face f: " << bisector_face_intersection << std::endl;
+            }
+
+            if(!has_bisector_face_intersection)
+            {
+              using Facet_key = std::pair<const void*, const void*>;
+
+              auto key_of_facet =
+                [&](const Facet& cand) -> Facet_key
                 {
-                  bisector_face_intersection = X;
-                  has_bisector_face_intersection = true;
-                  if (has_bisector_face_intersection) {
-                    std::cout << "🍜🍜🍜has_bisector_face_intersection --> X = " << X << std::endl;
+                  const void* p0 = &*cand.first;
+                  const void* p1 = &*cand.first->neighbor(cand.second);
+                  return (p0 < p1) ? Facet_key(p0, p1) : Facet_key(p1, p0);
+                };
+
+              auto is_boundary_facet =
+                [&](const Facet& cand) -> bool
+                {
+                  const Cell_handle c = cand.first;
+                  const int idx = cand.second;
+                  return c->label() != c->neighbor(idx)->label();
+                };
+
+              auto add_if_new_boundary =
+                [&](const Facet& cand,
+                    std::vector<Facet_key>& seen,
+                    std::vector<Facet>& out)
+                {
+                  if(!is_boundary_facet(cand))
+                    return;
+
+                  const Facet_key k = key_of_facet(cand);
+                  const bool already_seen =
+                    std::find(seen.begin(), seen.end(), k) != seen.end();
+                  if(already_seen)
+                    return;
+
+                  seen.push_back(k);
+                  out.push_back(cand);
+                };
+
+              auto adjacent_boundary_facets =
+                [&](const Facet& seed,
+                    std::vector<Facet_key>& seen,
+                    std::vector<Facet>& out)
+                {
+                  const Cell_handle c0 = seed.first;
+                  const int i0 = seed.second;
+                  const Cell_handle c1 = c0->neighbor(i0);
+                  const int i1 = c1->index(c0);
+
+                  for(int j = 0; j < 4; ++j)
+                    if(j != i0)
+                      add_if_new_boundary(Facet(c0, j), seen, out);
+
+                  for(int j = 0; j < 4; ++j)
+                    if(j != i1)
+                      add_if_new_boundary(Facet(c1, j), seen, out);
+                };
+
+              std::vector<Facet_key> seen;
+              seen.reserve(32);
+              seen.push_back(key_of_facet(f)); // exclude f itself
+
+              std::vector<Facet> ring1;
+              std::vector<Facet> ring2;
+              ring1.reserve(8);
+              ring2.reserve(16);
+
+              adjacent_boundary_facets(f, seen, ring1); // neighbors of f
+              for(const Facet& nf : ring1)
+                adjacent_boundary_facets(nf, seen, ring2); // neighbors of neighbors
+
+              bool has_best = false;
+              FT best_abs_t = FT(0);
+              Point_3 best_X;
+
+              auto try_facet_intersection =
+                [&](const Facet& cand)
+                {
+                  const Cell_handle c = cand.first;
+                  const int idx = cand.second;
+
+                  const Point_3& q0 = c->vertex((idx + 1) & 3)->point();
+                  const Point_3& q1 = c->vertex((idx + 2) & 3)->point();
+                  const Point_3& q2 = c->vertex((idx + 3) & 3)->point();
+
+                  Point_3 Xi;
+                  FT ti = FT(0);
+                  if(!line_triangle_intersection(q0, q1, q2, Xi, ti))
+                    return;
+
+                  const FT abs_ti = FT(CGAL::abs(CGAL::to_double(ti)));
+                  if(abs_ti <= FT(1e-10))
+                    return; // skip trivial self-hit at origin
+
+                  if(!has_best || abs_ti < best_abs_t)
+                  {
+                    has_best = true;
+                    best_abs_t = abs_ti;
+                    best_X = Xi;
                   }
-                }
-                else {
-                  std::cout << "🍎🚃🚃🚃no intersection with face f" << std::endl;
-                }
+                };
+
+              for(const Facet& nf : ring1)
+                try_facet_intersection(nf);
+              for(const Facet& nf : ring2)
+                try_facet_intersection(nf);
+
+              if(has_best)
+              {
+                bisector_face_intersection = best_X;
+                has_bisector_face_intersection = true;
+                std::cout << "[bisector] intersection found on neighboring boundary facet: "
+                          << bisector_face_intersection << std::endl;
               }
             }
           }
@@ -1680,19 +1798,19 @@ bool is_traversable(const Facet& f) const
 
       }
 
-// // #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
-//       if(has_cp_info)
-//       {
-//         std::cout << "closest_pt = " << cp_info.closest_point << std::endl;
-//
-//         if(cp_info.location == Closest_point_location::ON_FACE)
-//         {
-//           std::cout << "closest point location = ON_FACE" << std::endl;
-//         }
-//         else if(cp_info.location == Closest_point_location::ON_VERTEX)
-//         {
-//           std::cout << "closest point location = ON_VERTEX" << std::endl;
-//         }
+// #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+      if(has_cp_info)
+      {
+        // std::cout << "closest_pt = " << cp_info.closest_point << std::endl;
+        //
+        // if(cp_info.location == Closest_point_location::ON_FACE)
+        // {
+        //   std::cout << "closest point location = ON_FACE" << std::endl;
+        // }
+        if(cp_info.location == Closest_point_location::ON_VERTEX)
+        {
+          std::cout << "closest point location = ON_VERTEX" << std::endl;
+        }
 //         else
 //         {
 //           std::cout << "closest point location = ON_EDGE" << std::endl;
@@ -1717,11 +1835,15 @@ bool is_traversable(const Facet& f) const
 //             std::cout << "edge is boundary edge, no second triangle" << std::endl;
 //           }
 //         }
-//       }
+       }
 // #endif
 
 
       // next try to approximate furthest point on face --> when moving from concave edge to this point, this is a really rough approximation for concave edge on offset surface
+      if(!has_bisector_face_intersection)
+      {
+        std::cout << "[bisector] no valid intersection found; using fallback face-point strategy" << std::endl;
+      }
       Point_3 face_pt = has_bisector_face_intersection
                           ? bisector_face_intersection
                           : furthest_point_on_triangle(pts[0], pts[1], pts[2]); // fallback
