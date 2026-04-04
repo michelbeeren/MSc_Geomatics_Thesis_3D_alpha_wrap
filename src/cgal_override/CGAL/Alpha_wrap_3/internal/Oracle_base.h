@@ -78,6 +78,16 @@ struct AABB_tree_oracle_helper
     return projection_traits.closest_point();
   }
 
+  using Primitive_id = typename AABBTree::Primitive_id;
+  using Point_and_primitive_id = typename AABBTree::Point_and_primitive_id;
+
+  static Point_and_primitive_id closest_point_and_primitive(const Point_3& p,
+                                                            const AABBTree& tree)
+  {
+    CGAL_precondition(!tree.empty());
+    return tree.closest_point_and_primitive(p);
+  }
+
   static FT squared_distance(const Point_3& p,
                              const AABBTree& tree)
   {
@@ -121,6 +131,8 @@ protected:
   using AABB_traits = typename AABB_tree::AABB_traits;
   using AABB_traversal_traits = typename Default::Get<AABBTraversalTraits,
                                                       Default_traversal_traits<AABB_traits> >::type;
+  using Primitive_id = typename AABB_tree::Primitive_id;
+  using Point_and_primitive_id = typename AABB_tree::Point_and_primitive_id;
 
   using AABB_helper = AABB_tree_oracle_helper<AABB_tree, AABB_traversal_traits>;
 
@@ -225,6 +237,40 @@ public:
     }
   }
 
+  Point_and_primitive_id closest_point_and_primitive(const Point_3& p) const
+  {
+    CGAL_precondition(do_call());
+
+    if(base().do_call())
+    {
+      if(!empty()) // both non empty
+      {
+        const Point_and_primitive_id base_cp = base().closest_point_and_primitive(p);
+        const Point_and_primitive_id this_cp = AABB_helper::closest_point_and_primitive(p, tree());
+
+        return (compare_distance_to_point(p, base_cp.first, this_cp.first) == CGAL::SMALLER)
+                 ? base_cp
+                 : this_cp;
+      }
+      else // this level is empty
+      {
+        return base().closest_point_and_primitive(p);
+      }
+    }
+    else // empty base
+    {
+      return AABB_helper::closest_point_and_primitive(p, tree());
+    }
+  }
+
+  template <typename Result>
+  bool analyze_closest_point_and_primitive(const Point_3&,
+                                           const Primitive_id&,
+                                           Result&) const
+  {
+    return false;
+  }
+
   bool first_intersection(const Point_3& p, const Point_3& q,
                           Point_3& o,
                           const FT offset_size,
@@ -298,6 +344,8 @@ protected:
   using AABB_traits = typename AABB_tree::AABB_traits;
   using AABB_traversal_traits = typename Default::Get<AABBTraversalTraits,
                                                       Default_traversal_traits<AABB_traits> >::type;
+  using Primitive_id = typename AABB_tree::Primitive_id;
+  using Point_and_primitive_id = typename AABB_tree::Point_and_primitive_id;
 
   using AABB_helper = AABB_tree_oracle_helper<AABB_tree, AABB_traversal_traits>;
 
@@ -341,6 +389,20 @@ public:
   {
     CGAL_precondition(!empty());
     return AABB_helper::closest_point(p, tree());
+  }
+
+  Point_and_primitive_id closest_point_and_primitive(const Point_3& p) const
+  {
+    CGAL_precondition(!empty());
+    return AABB_helper::closest_point_and_primitive(p, tree());
+  }
+
+  template <typename Result>
+  bool analyze_closest_point_and_primitive(const Point_3&,
+                                           const Primitive_id&,
+                                           Result&) const
+  {
+    return false;
   }
 
   bool first_intersection(const Point_3& p, const Point_3& q, Point_3& o,

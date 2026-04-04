@@ -41,6 +41,7 @@
 #include <CGAL/Alpha_wrap_3/internal/gate_priority_queue.h>
 #include <CGAL/Alpha_wrap_3/internal/geometry_utils.h>
 #include <CGAL/Alpha_wrap_3/internal/oracles.h>
+#include <CGAL/Alpha_wrap_3/internal/Oracle_base.h>
 
 #include <CGAL/Delaunay_triangulation_3.h>
 #include <CGAL/Triangulation_data_structure_3.h>
@@ -1054,7 +1055,137 @@ bool use_octree(const Facet& f) const{
   return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
 }
 
+ enum class Closest_point_location
+{
+  ON_FACE,
+  ON_EDGE,
+  ON_VERTEX
+};
+
+struct Shared_edge_result
+{
+  Closest_point_location location;
+  bool has_second_face = false;
+  bool has_shared_edge_points = false; // true when A/B/C/D are valid
+
+  Point_3 closest_point;
+
+  // Shared-edge decomposition:
+  // A-B is the shared edge, C is opposite in triangle 1, D is opposite in triangle 2.
+  Point_3 shared_edge_a, shared_edge_b, triangle_1_opposite, triangle_2_opposite;
+
+  // first triangle closest_point_and_primitive() gave
+  Point_3 t0_a, t0_b, t0_c;
+
+  // second triangle, only if has_second_face == true
+  Point_3 t1_a, t1_b, t1_c;
+};
+
+template <typename TriangleMesh, typename VertexPointMap, typename FaceDescriptor>
+Shared_edge_result analyze_closest_point_on_input_mesh(const Point_3& closest_pt,
+                                                       const FaceDescriptor fd,
+                                                       const TriangleMesh& tm,
+                                                       VertexPointMap vpm) const
+{
+  using halfedge_descriptor = boost::graph_traits<TriangleMesh>::halfedge_descriptor;
+  using face_descriptor = boost::graph_traits<TriangleMesh>::face_descriptor;
+
+  Shared_edge_result out;
+  out.closest_point = closest_pt;
+
+  const FT eps = FT(1e-12);
+
+  const auto sqd =
+    [this](const Point_3& p, const Point_3& q) -> FT
+    {
+      return m_oracle.geom_traits().compute_squared_distance_3_object()(p, q);
+    };
+
+  const auto same_point =
+    [&](const Point_3& p, const Point_3& q) -> bool
+    {
+      return sqd(p, q) <= eps;
+    };
+
+  auto h = halfedge(fd, tm);
+  const halfedge_descriptor h0 = h;
+  const halfedge_descriptor h1 = next(h0, tm);
+  const halfedge_descriptor h2 = next(h1, tm);
+
+  const Point_3& a = get(vpm, source(h0, tm));
+  const Point_3& b = get(vpm, target(h0, tm));
+  const Point_3& c = get(vpm, target(h1, tm));
+
+  out.t0_a = a;
+  out.t0_b = b;
+  out.t0_c = c;
+
+  // Eerst: vertex?
+  if(same_point(closest_pt, a) || same_point(closest_pt, b) || same_point(closest_pt, c))
+  {
+    out.location = Closest_point_location::ON_VERTEX;
+    return out;
+  }
+
+  // Dan: edge?
+  const Segment_3 s0(a, b);
+  const Segment_3 s1(b, c);
+  const Segment_3 s2(c, a);
+
+  halfedge_descriptor edge_h;
+  bool on_edge = false;
+
+  if(s0.has_on(closest_pt))
+  {
+    edge_h = h0;
+    on_edge = true;
+  }
+  else if(s1.has_on(closest_pt))
+  {
+    edge_h = h1;
+    on_edge = true;
+  }
+  else if(s2.has_on(closest_pt))
+  {
+    edge_h = h2;
+    on_edge = true;
+  }
+
+  if(!on_edge)
+  {
+    out.location = Closest_point_location::ON_FACE;
+    return out;
+  }
+
+  out.location = Closest_point_location::ON_EDGE;
+
+  // Zoek de buurface aan de andere kant van die edge
+  const halfedge_descriptor opp = opposite(edge_h, tm);
+  const face_descriptor nfd = face(opp, tm);
+
+  if(nfd == boost::graph_traits<TriangleMesh>::null_face())
+  {
+    // boundary edge, dus geen tweede triangle
+    out.has_second_face = false;
+    return out;
+  }
+
+  out.has_second_face = true;
+
+  auto nh = halfedge(nfd, tm);
+  const auto nh0 = nh;
+  const auto nh1 = next(nh0, tm);
+  const auto nh2 = next(nh1, tm);
+
+  out.t1_a = get(vpm, source(nh0, tm));
+  out.t1_b = get(vpm, target(nh0, tm));
+  out.t1_c = get(vpm, target(nh1, tm));
+
+  return out;
+}
+
   // function which checks if face midpoint is too far from input
+// ToDo --> now only checks distance to input from midpoint of the triangle, this is approximation for furthest distance to input for triangle, so can be improved
 bool too_far_from_input(const Facet& f) const {
   const Cell_handle ch = f.first; // current cell
   const int i = f.second; // neighbor cell
@@ -1107,7 +1238,7 @@ bool is_traversable(const Facet& f) const
     return traversable;
   }
 
-  // A) MAT-based behavior: when MAT is used
+  // B) MAT-based behavior: when MAT is used
   if ((m_use_mat || m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr)) {
     bool traversable = use_mat(f); // check if face is traversable using MAT implementation
     if (check_face_distance_from_input)
@@ -1122,7 +1253,7 @@ bool is_traversable(const Facet& f) const
       return traversable;
   }
 
-  // B) Octree-based behavior: when Octree is used but no MAT
+  // C) Octree-based behavior: when Octree is used but no MAT
   if ((!m_use_mat || !m_fs_mat_ptr) && (m_use_octree || m_octree_ptr)) {
     bool traversable = use_octree(f);
     if (check_face_distance_from_input)
@@ -1317,8 +1448,8 @@ bool is_traversable(const Facet& f) const
 #endif
 
     // ch's circumcenter should not be within the offset volume
-    CGAL_assertion_code(const Point_3& ch_cc = circumcenter(ch);)
-    CGAL_assertion_code(const Ball_3 ch_cc_offset_ball = ball(ch_cc, m_sq_offset);)
+    CGAL_assertion_code(const Point_3& ch_cc_assert = circumcenter(ch);)
+    CGAL_assertion_code(const Ball_3 ch_cc_offset_ball = ball(ch_cc_assert, m_sq_offset);)
     CGAL_assertion(!m_oracle.do_intersect(ch_cc_offset_ball));
 
     if(is_neighbor_cc_in_offset)
@@ -1412,8 +1543,8 @@ bool is_traversable(const Facet& f) const
 #endif
 
     // ch's circumcenter should not be within the offset volume
-    CGAL_assertion_code(const Point_3& ch_cc = circumcenter(ch);)
-    CGAL_assertion_code(const Ball_3 ch_cc_offset_ball = ball(ch_cc, m_sq_offset);)
+    CGAL_assertion_code(const Point_3& ch_cc_assert = circumcenter(ch);)
+    CGAL_assertion_code(const Ball_3 ch_cc_offset_ball = ball(ch_cc_assert, m_sq_offset);)
     CGAL_assertion(!m_oracle.do_intersect(ch_cc_offset_ball));
 
   // ToDo; This should be implemented nicer, but the idea is that only the modified method of steiner insertion is used for small faces. But now a bit double.
@@ -1441,12 +1572,159 @@ bool is_traversable(const Facet& f) const
   {
   // Find the closest point from neighboring tetrahedron midpoint on input (= inside offset)
       // In case of concave edge (higher change for small triangles), this has a potential to snap to the concave edge
-  const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
-  CGAL_assertion(closest_pt != neighbor_cc);
+  // const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
+      const auto cp = m_oracle.closest_point_and_primitive(neighbor_cc);
+      const Point_3& closest_pt = cp.first;
+      Shared_edge_result cp_info;
+      const bool has_cp_info =
+        m_oracle.analyze_closest_point_and_primitive(closest_pt, cp.second, cp_info);
+
+      Point_3 bisector_face_intersection;
+      bool has_bisector_face_intersection = false;
+
+      if(has_cp_info && cp_info.has_second_face && cp_info.has_shared_edge_points)
+      {
+        // if closest point is on a shared edge -> triangle 1 = (A,B,C), triangle 2 = (B, A, D)
+        const Point_3& A = cp_info.shared_edge_a;       // shared edge endpoint 1
+        const Point_3& B = cp_info.shared_edge_b;       // shared edge endpoint 2
+        const Point_3& C = cp_info.triangle_1_opposite; // opposite vertex in triangle 1
+        const Point_3& D = cp_info.triangle_2_opposite; // opposite vertex in triangle 2
+
+        auto dot = geom_traits().compute_scalar_product_3_object();
+
+        auto safe_normalize =
+          [&](const Vector_3& v, Vector_3& unit_out) -> bool
+          {
+            const FT sql = sq_length(v);
+            const double l = std::sqrt(CGAL::to_double(sql));
+            if(l <= 1e-12)
+              return false;
+
+            unit_out = scale(v, FT(1.0 / l));
+            return true;
+          };
+
+        const Vector_3 edge = vector(A, B);
+        Vector_3 edge_unit;
+        if(!safe_normalize(edge, edge_unit))
+        {
+          // degenerate edge, skip this strategy
+        }
+        else
+        {
+          // Remove edge component so directions lie in the normal section of edge AB
+          const Vector_3 vC = vector(closest_pt, C);
+          const Vector_3 vD = vector(closest_pt, D);
+          const FT vC_edge = dot(vC, edge_unit);
+          const FT vD_edge = dot(vD, edge_unit);
+
+          const Vector_3 w1 = vC - scale(edge_unit, vC_edge);
+          const Vector_3 w2 = vD - scale(edge_unit, vD_edge);
+
+          Vector_3 w1_unit, w2_unit;
+          if(safe_normalize(w1, w1_unit) && safe_normalize(w2, w2_unit))
+          {
+            // Bisector in the plane orthogonal to AB
+            Vector_3 bisec_dir;
+            if(!safe_normalize(w1_unit + w2_unit, bisec_dir))
+            {
+              // fallback: if almost opposite, use one valid side direction
+              bisec_dir = w1_unit;
+            }
+
+            // Intersect line L(t)=closest_pt + t*bisec_dir with plane of face f
+            const Vector_3 f01 = vector(pts[0], pts[1]);
+            const Vector_3 f02 = vector(pts[0], pts[2]);
+            const Vector_3 nf = cross(f01, f02);
+
+            const FT denom = dot(bisec_dir, nf);
+            if(CGAL::abs(CGAL::to_double(denom)) > 1e-12)
+            {
+              const FT t = dot(vector(closest_pt, pts[0]), nf) / denom;
+              const Point_3 X = translate(closest_pt, scale(bisec_dir, t));
+
+              // inside-triangle test on face f by barycentric coordinates
+              const Vector_3 a = f01;
+              const Vector_3 b = f02;
+              const Vector_3 c = vector(pts[0], X);
+
+              const FT aa = dot(a, a);
+              const FT ab = dot(a, b);
+              const FT bb = dot(b, b);
+              const FT ac = dot(a, c);
+              const FT bc = dot(b, c);
+              const FT delta = aa * bb - ab * ab;
+
+              if(CGAL::abs(CGAL::to_double(delta)) > 1e-16)
+              {
+                const FT u = (bb * ac - ab * bc) / delta;
+                const FT v = (aa * bc - ab * ac) / delta;
+                const FT eps = FT(1e-10);
+                const bool inside = (u >= -eps && v >= -eps && (u + v) <= FT(1) + eps);
+
+                if(inside)
+                {
+                  bisector_face_intersection = X;
+                  has_bisector_face_intersection = true;
+                  if (has_bisector_face_intersection) {
+                    std::cout << "🍜🍜🍜has_bisector_face_intersection --> X = " << X << std::endl;
+                  }
+                }
+                else {
+                  std::cout << "🍎🚃🚃🚃no intersection with face f" << std::endl;
+                }
+              }
+            }
+          }
+        }
+
+      }
+
+// // #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
+//       if(has_cp_info)
+//       {
+//         std::cout << "closest_pt = " << cp_info.closest_point << std::endl;
+//
+//         if(cp_info.location == Closest_point_location::ON_FACE)
+//         {
+//           std::cout << "closest point location = ON_FACE" << std::endl;
+//         }
+//         else if(cp_info.location == Closest_point_location::ON_VERTEX)
+//         {
+//           std::cout << "closest point location = ON_VERTEX" << std::endl;
+//         }
+//         else
+//         {
+//           std::cout << "closest point location = ON_EDGE" << std::endl;
+//           std::cout << "triangle 1 = "
+//                     << cp_info.t0_a << " , " << cp_info.t0_b << " , " << cp_info.t0_c << std::endl;
+//
+//           if(cp_info.has_second_face)
+//           {
+//             std::cout << "triangle 2 = "
+//                       << cp_info.t1_a << " , " << cp_info.t1_b << " , " << cp_info.t1_c << std::endl;
+//
+//             if(cp_info.has_shared_edge_points)
+//             {
+//               std::cout << "A(shared edge) = " << cp_info.shared_edge_a << std::endl;
+//               std::cout << "B(shared edge) = " << cp_info.shared_edge_b << std::endl;
+//               std::cout << "C(triangle 1 opposite) = " << cp_info.triangle_1_opposite << std::endl;
+//               std::cout << "D(triangle 2 opposite) = " << cp_info.triangle_2_opposite << std::endl;
+//             }
+//           }
+//           else
+//           {
+//             std::cout << "edge is boundary edge, no second triangle" << std::endl;
+//           }
+//         }
+//       }
+// #endif
 
 
       // next try to approximate furthest point on face --> when moving from concave edge to this point, this is a really rough approximation for concave edge on offset surface
-      Point_3 face_pt = furthest_point_on_triangle(pts[0], pts[1], pts[2]); // optimal point on triangle
+      Point_3 face_pt = has_bisector_face_intersection
+                          ? bisector_face_intersection
+                          : furthest_point_on_triangle(pts[0], pts[1], pts[2]); // fallback
       // Point_3 face_pt = mid_pt_of_triangle(pts[0], pts[1], pts[2]); // try just face mid
       // Point_3 face_pt = ch_cc; // or just use ch_cc
 
@@ -1483,7 +1761,7 @@ private:
     HAS_INFINITE_NEIGHBOR, // the cell incident to the mirrored facet is infinite (permissive)
     SCAFFOLDING, // incident to a SEED or BBOX vertex (permissive)
     TRAVERSABLE,
-    IS_ZOMBIE_CELL, // with new traversability rules --> empty labeled inside cells may exist at the boundary, ensure these zombie cells still get flood filled
+    IS_ZOMBIE_CELL, // with new traversability rules --> empty labeled 'inside' cells may exist at the boundary, ensure these zombie cells still get flood filled
   };
 
   inline const char* get_status_message(const Facet_status status)

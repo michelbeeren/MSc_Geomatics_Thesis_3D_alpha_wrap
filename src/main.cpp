@@ -42,15 +42,15 @@ using Tree        = CGAL::AABB_tree<AABB_traits>;
 int main(int argc, char** argv)
 {
   // Read the input
-  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Input/3DBAG_Buildings/aula.off");
+  const std::string filename = (argc > 1) ? argv[1] : CGAL::data_file_path("../data/Input/3DBAG_Buildings/bouwkunde.off");
     std::cout << "------------------------------------------------------------" << std::endl;
   std::cout << "Reading input: " << filename << std::endl;
 
-  const double relative_alpha = 20; //2000. //20. //1000.
-  const double relative_offset = 2000.; // 7000. //600. //12000.
+  const double relative_alpha = 40; //2000. //20. //1000.
+  const double relative_offset = 10000.; // 7000. //600. //12000.
 
   bool beeren_method = true;
-  const double max_d_to_input_in_offsets_ = 1.5;
+  const double max_d_to_input_in_offsets_ = 3;
   bool write_output_ = true;
   bool validate_ = true;
 
