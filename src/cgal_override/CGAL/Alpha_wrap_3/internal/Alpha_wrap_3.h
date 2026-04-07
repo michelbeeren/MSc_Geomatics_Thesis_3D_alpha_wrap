@@ -1084,6 +1084,19 @@ bool too_far_from_input(const Facet& f) const {
   return false;
 }
 
+  // check if a candidate Steiner point is at least m_offset away from existing vertices
+bool far_enough_from_other_points(const Point_3& steiner_point) const {
+  const typename Geom_traits::Compute_squared_distance_3 sq_dist =
+      geom_traits().compute_squared_distance_3_object();
+
+  for (Vertex_handle vh : m_tr.finite_vertex_handles()) {
+    if (sq_dist(steiner_point, vh->point()) < 0.005) {
+      return false;
+    }
+  }
+  return true;
+}
+
   // function to check if a face is traversible
 bool is_traversable(const Facet& f) const
 {
@@ -1102,6 +1115,22 @@ bool is_traversable(const Facet& f) const
       // only check if a face midpoint is too far from input if face normally is not traversable
         // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
       traversable = too_far_from_input(f);
+      // // trying out method to set a minimum distance to other points
+      // if (traversable) {
+      //   const Cell_handle ch = f.first;
+      //   const Cell_handle nh = ch->neighbor(f.second);
+      //   Point_3 steiner_point;
+      //   const bool has_steiner_point = compute_steiner_point(ch, nh, steiner_point);
+      //   const bool is_far_enough = has_steiner_point && far_enough_from_other_points(steiner_point);
+      //
+      //   if (!is_far_enough) {
+      //     traversable = false;
+      //   }
+      //   if (!is_far_enough) {
+      //     std::cout << " -> too close to an existing point (< m_offset), keep non-traversable";
+      //   }
+      //   std::cout << std::endl;
+      // }
     }
 
     return traversable;
@@ -1118,6 +1147,13 @@ bool is_traversable(const Facet& f) const
       // only check if a face midpoint is too far from input if face normally is not traversable
       // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
       traversable = too_far_from_input(f);
+      if (traversable) {
+        const Cell_handle ch = f.first;
+        const Cell_handle nh = ch->neighbor(f.second);
+        Point_3 steiner_point;
+        const bool has_steiner_point = compute_steiner_point(ch, nh, steiner_point);
+        traversable = has_steiner_point && far_enough_from_other_points(steiner_point);
+      }
     }
       return traversable;
   }
@@ -1133,6 +1169,13 @@ bool is_traversable(const Facet& f) const
       // only check if a face midpoint is too far from input if face normally is not traversable
       // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
       traversable = too_far_from_input(f);
+      if (traversable) {
+        const Cell_handle ch = f.first;
+        const Cell_handle nh = ch->neighbor(f.second);
+        Point_3 steiner_point;
+        const bool has_steiner_point = compute_steiner_point(ch, nh, steiner_point);
+        traversable = has_steiner_point && far_enough_from_other_points(steiner_point);
+      }
     }
     return traversable;
   }
@@ -1147,6 +1190,13 @@ bool is_traversable(const Facet& f) const
     // only check if a face midpoint is too far from input if face normally is not traversable
     // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
     traversable = too_far_from_input(f);
+    if (traversable) {
+      const Cell_handle ch = f.first;
+      const Cell_handle nh = ch->neighbor(f.second);
+      Point_3 steiner_point;
+      const bool has_steiner_point = compute_steiner_point(ch, nh, steiner_point);
+      traversable = has_steiner_point && far_enough_from_other_points(steiner_point);
+    }
   }
   return traversable;
 }
@@ -1594,10 +1644,11 @@ public:
       return Facet_status::TRAVERSABLE;
     }
 
-    if (!is_traversable(f) && is_empty_cell(nh)) {
-        // std::cout << "🧟🧟🧟face is NOT traversable, but neighbor cell IS empty!🧟🧟🧟" << std::endl;
-        return Facet_status::IS_ZOMBIE_CELL;
-      }
+    if (is_empty_cell(nh)) {
+      // std::cout << "🧟🧟🧟face is NOT traversable, but neighbor cell IS empty!🧟🧟🧟" << std::endl;
+      return Facet_status::IS_ZOMBIE_CELL;
+    }
+
         // std::cout << "👼🏼👼🏼👼🏼face is NOT traversable, and neighbor cell contains input!👼🏼👼🏼👼🏼" << std::endl;
 
 #ifdef CGAL_AW3_DEBUG_FACET_STATUS
