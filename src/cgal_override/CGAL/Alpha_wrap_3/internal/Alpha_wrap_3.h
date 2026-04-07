@@ -1090,7 +1090,7 @@ bool far_enough_from_other_points(const Point_3& steiner_point) const {
       geom_traits().compute_squared_distance_3_object();
 
   for (Vertex_handle vh : m_tr.finite_vertex_handles()) {
-    double min_dist = 0.08;
+    double min_dist = 0.03;
     double sq_min_dist = min_dist*min_dist;
     if (sq_dist(steiner_point, vh->point()) < sq_min_dist) {
       return false;
@@ -1131,7 +1131,6 @@ bool is_traversable(const Facet& f) const
         if (!is_far_enough) {
           std::cout << " -> too close to an existing point (< m_offset), keep non-traversable";
         }
-        std::cout << std::endl;
       }
     }
 

@@ -489,6 +489,8 @@ Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_al
         }
         std::cout << "📝 Writing 📝 to: " << output_ << std::endl;
         CGAL::IO::write_polygon_mesh(output_, wrap, CGAL::parameters::stream_precision(25));
+        double dmin = smallest_point_to_point_distance_from_off(output_);
+        std::cout << "min distance between output points = " << dmin << std::endl;
     }
 
     // ----------------------------- validate the output ------------------------------
