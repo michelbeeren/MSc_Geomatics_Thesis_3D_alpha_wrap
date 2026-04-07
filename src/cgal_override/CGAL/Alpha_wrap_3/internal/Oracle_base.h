@@ -17,10 +17,12 @@
 #include <CGAL/Alpha_wrap_3/internal/offset_intersection.h>
 
 #include <CGAL/AABB_tree/internal/AABB_traversal_traits.h>
+#include <CGAL/AABB_tree/internal/Primitive_helper.h>
 #include <CGAL/Default.h>
 
 #include <algorithm>
 #include <memory>
+#include <type_traits>
 
 namespace CGAL {
 namespace Alpha_wraps_3 {
@@ -78,6 +80,64 @@ struct AABB_tree_oracle_helper
     return projection_traits.closest_point();
   }
 
+  static Point_3 closest_point_edge_vertex(const Point_3& p,
+                                           const AABBTree& tree)
+  {
+    CGAL_precondition(!tree.empty());
+
+    using Primitive = typename AABB_traits::Primitive;
+    using Primitive_id = typename Primitive::Id;
+    using Node = ::CGAL::AABB_node<AABB_traits>;
+
+    class Edge_vertex_projection_traits
+    {
+    public:
+      Edge_vertex_projection_traits(const Point_3& hint,
+                                    const Primitive_id& hint_primitive,
+                                    const AABB_traits& traits)
+        : m_closest_point(hint),
+          m_closest_primitive(hint_primitive),
+          m_traits(traits)
+      { }
+
+      constexpr bool go_further() const { return true; }
+
+      void intersection(const Point_3& query, const Primitive& primitive)
+      {
+        const Point_3 new_closest_point =
+          Self::closest_point_on_edges_vertices(query, primitive, m_closest_point, m_traits);
+
+        if(!m_traits.equal_object()(new_closest_point, m_closest_point))
+        {
+          m_closest_primitive = primitive.id();
+          m_closest_point = new_closest_point;
+        }
+      }
+
+      bool do_intersect(const Point_3& query, const Node& node) const
+      {
+        return m_traits.compare_distance_object()
+          (query, node.bbox(), m_closest_point) == CGAL::SMALLER;
+      }
+
+      Point_3 closest_point() const { return m_closest_point; }
+
+    private:
+      Point_3 m_closest_point;
+      Primitive_id m_closest_primitive;
+      const AABB_traits& m_traits;
+    };
+
+    const auto& hint = tree.best_hint(p);
+    const Primitive hint_primitive(hint.second);
+    const Point_3 edge_vertex_hint =
+      Self::closest_point_on_edges_vertices_unbounded(p, hint_primitive, tree.traits());
+
+    Edge_vertex_projection_traits projection_traits(edge_vertex_hint, hint.second, tree.traits());
+    tree.traversal(p, projection_traits);
+    return projection_traits.closest_point();
+  }
+
   static FT squared_distance(const Point_3& p,
                              const AABBTree& tree)
   {
@@ -86,6 +146,59 @@ struct AABB_tree_oracle_helper
     const Point_3 closest = Self::closest_point(p, tree);
     return tree.traits().squared_distance_object()(p, closest);
   }
+
+private:
+  template <typename Primitive>
+  static Point_3 closest_point_on_edges_vertices_unbounded(const Point_3& query,
+                                                           const Primitive& primitive,
+                                                           const AABB_traits& traits)
+  {
+    using Datum = typename Primitive::Datum;
+    using Triangle_3 = typename GT::Triangle_3;
+
+    const GT gt;
+    const auto datum = CGAL::internal::Primitive_helper<AABB_traits>::get_datum(primitive, traits);
+
+    if constexpr(std::is_same<Datum, Triangle_3>::value)
+    {
+      const auto vertex = gt.construct_vertex_3_object();
+      const auto segment = gt.construct_segment_3_object();
+      const auto project = gt.construct_projected_point_3_object();
+      const auto compare_distance = gt.compare_distance_3_object();
+
+      const Point_3& p0 = vertex(datum, 0);
+      const Point_3& p1 = vertex(datum, 1);
+      const Point_3& p2 = vertex(datum, 2);
+
+      const Point_3 c01 = project(segment(p0, p1), query);
+      const Point_3 c12 = project(segment(p1, p2), query);
+      const Point_3 c20 = project(segment(p2, p0), query);
+
+      Point_3 candidate = c01;
+      if(compare_distance(query, c12, candidate) == CGAL::SMALLER)
+        candidate = c12;
+      if(compare_distance(query, c20, candidate) == CGAL::SMALLER)
+        candidate = c20;
+
+      return candidate;
+    }
+
+    return gt.construct_projected_point_3_object()(datum, query);
+  }
+
+  template <typename Primitive>
+  static Point_3 closest_point_on_edges_vertices(const Point_3& query,
+                                                 const Primitive& primitive,
+                                                 const Point_3& bound,
+                                                 const AABB_traits& traits)
+  {
+    const GT gt;
+    const auto compare_distance = gt.compare_distance_3_object();
+    const Point_3 candidate = Self::closest_point_on_edges_vertices_unbounded(query, primitive, traits);
+    return (compare_distance(query, candidate, bound) == CGAL::SMALLER) ? candidate : bound;
+  }
+
+public:
 
   static bool first_intersection(const Point_3& p, const Point_3& q, Point_3& o,
                                  const FT offset_size,
@@ -225,6 +338,30 @@ public:
     }
   }
 
+  Point_3 closest_point_edge_vertex(const Point_3& p) const
+  {
+    CGAL_precondition(do_call());
+
+    if(base().do_call())
+    {
+      if(!empty()) // both non empty
+      {
+        const Point_3 base_c = base().closest_point_edge_vertex(p);
+        // @speed could do a smarter traversal, no need to search deeper than the current best
+        const Point_3 this_c = AABB_helper::closest_point_edge_vertex(p, tree());
+        return (compare_distance_to_point(p, base_c, this_c) == CGAL::SMALLER) ? base_c : this_c;
+      }
+      else // this level is empty
+      {
+        return base().closest_point_edge_vertex(p);
+      }
+    }
+    else // empty base
+    {
+      return AABB_helper::closest_point_edge_vertex(p, tree());
+    }
+  }
+
   bool first_intersection(const Point_3& p, const Point_3& q,
                           Point_3& o,
                           const FT offset_size,
@@ -341,6 +478,12 @@ public:
   {
     CGAL_precondition(!empty());
     return AABB_helper::closest_point(p, tree());
+  }
+
+  Point_3 closest_point_edge_vertex(const Point_3& p) const
+  {
+    CGAL_precondition(!empty());
+    return AABB_helper::closest_point_edge_vertex(p, tree());
   }
 
   bool first_intersection(const Point_3& p, const Point_3& q, Point_3& o,

@@ -1412,7 +1412,6 @@ bool is_traversable(const Facet& f) const
 #endif
 
     // ch's circumcenter should not be within the offset volume
-    CGAL_assertion_code(const Point_3& ch_cc = circumcenter(ch);)
     CGAL_assertion_code(const Ball_3 ch_cc_offset_ball = ball(ch_cc, m_sq_offset);)
     CGAL_assertion(!m_oracle.do_intersect(ch_cc_offset_ball));
 
@@ -1441,8 +1440,9 @@ bool is_traversable(const Facet& f) const
   {
   // Find the closest point from neighboring tetrahedron midpoint on input (= inside offset)
       // In case of concave edge (higher change for small triangles), this has a potential to snap to the concave edge
-  const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
+  const Point_3 closest_pt = m_oracle.closest_point_edge_vertex(neighbor_cc);
   CGAL_assertion(closest_pt != neighbor_cc);
+      std::cout << "closest_point = " << closest_pt << std::endl;
 
 
       // next try to approximate furthest point on face --> when moving from concave edge to this point, this is a really rough approximation for concave edge on offset surface
