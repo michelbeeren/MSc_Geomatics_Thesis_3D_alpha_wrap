@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <sstream>
 #include <fstream>
+#include <limits>
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Surface_mesh.h>
 #include <vector>
@@ -137,6 +138,107 @@ Input_kind detect_input_kind(const std::string& filename)
     }
 
     return Input_kind::Unknown;
+}
+
+double smallest_point_to_point_distance_from_off(const std::string& off_filename)
+{
+    auto is_comment_or_empty = [](const std::string& s) -> bool
+    {
+        const std::size_t first = s.find_first_not_of(" \t\r\n");
+        return (first == std::string::npos || s[first] == '#');
+    };
+
+    std::ifstream in(off_filename);
+    if(!in)
+    {
+        throw std::runtime_error("Failed to open OFF file: " + off_filename);
+    }
+
+    std::string line;
+    std::string header;
+
+    std::size_t num_vertices = 0;
+    std::size_t num_faces = 0;
+    std::size_t num_edges = 0;
+    bool got_counts = false;
+
+    while(std::getline(in, line))
+    {
+        if(is_comment_or_empty(line))
+            continue;
+
+        std::istringstream ls(line);
+        ls >> header;
+        if(!header.empty()) {
+            if(header == "OFF" && (ls >> num_vertices >> num_faces >> num_edges))
+                got_counts = true;
+            break;
+        }
+    }
+
+    if(header != "OFF")
+    {
+        throw std::runtime_error("Invalid OFF header in file: " + off_filename);
+    }
+
+    while(!got_counts && std::getline(in, line))
+    {
+        if(is_comment_or_empty(line))
+            continue;
+
+        std::istringstream ls(line);
+        if(ls >> num_vertices >> num_faces >> num_edges)
+        {
+            got_counts = true;
+            break;
+        }
+    }
+
+    if(!got_counts)
+    {
+        throw std::runtime_error("Missing OFF counts line in file: " + off_filename);
+    }
+    (void)num_faces;
+    (void)num_edges;
+
+    std::vector<Point_3> points;
+    points.reserve(num_vertices);
+
+    while(points.size() < num_vertices && std::getline(in, line))
+    {
+        if(is_comment_or_empty(line))
+            continue;
+
+        std::istringstream ls(line);
+        double x = 0.0, y = 0.0, z = 0.0;
+        if(!(ls >> x >> y >> z))
+            continue;
+
+        points.emplace_back(x, y, z);
+    }
+
+    if(points.size() != num_vertices)
+    {
+        throw std::runtime_error("OFF vertex section is incomplete in file: " + off_filename);
+    }
+
+    if(points.size() < 2)
+    {
+        throw std::runtime_error("Need at least 2 points to compute a distance: " + off_filename);
+    }
+
+    double min_sq_dist = std::numeric_limits<double>::infinity();
+    for(std::size_t i = 0; i + 1 < points.size(); ++i)
+    {
+        for(std::size_t j = i + 1; j < points.size(); ++j)
+        {
+            const double d2 = CGAL::to_double(CGAL::squared_distance(points[i], points[j]));
+            if(d2 < min_sq_dist)
+                min_sq_dist = d2;
+        }
+    }
+
+    return std::sqrt(min_sq_dist);
 }
 
 // --------------------------------------ALPHA WRAP-------------------------------------

@@ -1090,7 +1090,9 @@ bool far_enough_from_other_points(const Point_3& steiner_point) const {
       geom_traits().compute_squared_distance_3_object();
 
   for (Vertex_handle vh : m_tr.finite_vertex_handles()) {
-    if (sq_dist(steiner_point, vh->point()) < 0.005) {
+    double min_dist = 0.08;
+    double sq_min_dist = min_dist*min_dist;
+    if (sq_dist(steiner_point, vh->point()) < sq_min_dist) {
       return false;
     }
   }
@@ -1115,22 +1117,22 @@ bool is_traversable(const Facet& f) const
       // only check if a face midpoint is too far from input if face normally is not traversable
         // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
       traversable = too_far_from_input(f);
-      // // trying out method to set a minimum distance to other points
-      // if (traversable) {
-      //   const Cell_handle ch = f.first;
-      //   const Cell_handle nh = ch->neighbor(f.second);
-      //   Point_3 steiner_point;
-      //   const bool has_steiner_point = compute_steiner_point(ch, nh, steiner_point);
-      //   const bool is_far_enough = has_steiner_point && far_enough_from_other_points(steiner_point);
-      //
-      //   if (!is_far_enough) {
-      //     traversable = false;
-      //   }
-      //   if (!is_far_enough) {
-      //     std::cout << " -> too close to an existing point (< m_offset), keep non-traversable";
-      //   }
-      //   std::cout << std::endl;
-      // }
+      // trying out method to set a minimum distance to other points
+      if (traversable) {
+        const Cell_handle ch = f.first;
+        const Cell_handle nh = ch->neighbor(f.second);
+        Point_3 steiner_point;
+        const bool has_steiner_point = compute_steiner_point(ch, nh, steiner_point);
+        const bool is_far_enough = has_steiner_point && far_enough_from_other_points(steiner_point);
+
+        if (!is_far_enough) {
+          traversable = false;
+        }
+        if (!is_far_enough) {
+          std::cout << " -> too close to an existing point (< m_offset), keep non-traversable";
+        }
+        std::cout << std::endl;
+      }
     }
 
     return traversable;
@@ -1635,6 +1637,11 @@ public:
       }
     }
 
+    if (is_empty_cell(nh)) {
+      // std::cout << "🧟🧟🧟face is NOT traversable, but neighbor cell IS empty!🧟🧟🧟" << std::endl;
+      return Facet_status::IS_ZOMBIE_CELL;
+    }
+
     // skip if f min empty sphere radius is smaller than alpha
     if(is_traversable(f))
     {
@@ -1644,10 +1651,7 @@ public:
       return Facet_status::TRAVERSABLE;
     }
 
-    if (is_empty_cell(nh)) {
-      // std::cout << "🧟🧟🧟face is NOT traversable, but neighbor cell IS empty!🧟🧟🧟" << std::endl;
-      return Facet_status::IS_ZOMBIE_CELL;
-    }
+
 
         // std::cout << "👼🏼👼🏼👼🏼face is NOT traversable, and neighbor cell contains input!👼🏼👼🏼👼🏼" << std::endl;
 

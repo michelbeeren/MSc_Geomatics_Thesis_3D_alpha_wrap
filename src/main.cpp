@@ -89,6 +89,9 @@ int main(int argc, char** argv)
     throw std::runtime_error("Input is neither a valid triangle mesh nor a valid point cloud: " + filename);
   }
 
+  double dmin = smallest_point_to_point_distance_from_off("../data/Output/3DBAG_Buildings/aula_a=20_offset=2000_refined=1.5.off");
+  std::cout << "dmin = " << dmin << std::endl;
+
     // ------------------------------ALPHA WRAP INPUT---------------------------------------
     // Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, data, true, false, false, true, true, false); // set both to false if you do not want to write out the file and test if valid
 

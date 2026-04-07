@@ -29,5 +29,6 @@ Mesh _3D_alpha_inside_wrap(const std::string filename, const double relative_alp
 MeshData mesh_input(const std::string& filename, bool compute_normals = true, bool build_tree = true);
 Point_container point_input(const std::string& filename);
 Input_kind detect_input_kind(const std::string& filename);
+double smallest_point_to_point_distance_from_off(const std::string& off_filename);
 
 #endif //THESIS_ALPHA_WRAP_H
