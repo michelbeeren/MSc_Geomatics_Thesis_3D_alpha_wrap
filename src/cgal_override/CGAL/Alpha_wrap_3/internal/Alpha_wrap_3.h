@@ -1581,6 +1581,7 @@ bool is_traversable(const Facet& f) const
 
       Point_3 bisector_face_intersection;
       bool has_bisector_face_intersection = false;
+      bool force_fallback_face_pt = false;
 
       if(has_cp_info && cp_info.has_second_face && cp_info.has_shared_edge_points)
       {
@@ -1762,6 +1763,51 @@ bool is_traversable(const Facet& f) const
         }
 
       }
+      else if(has_cp_info && cp_info.location == Closest_point_location::ON_FACE)
+      {
+        std::cout << "closest point lies on face" << std::endl;
+
+        const Vector_3 to_closest = vector(neighbor_cc, closest_pt);
+        const FT to_closest_sq = sq_length(to_closest);
+
+        if(CGAL::to_double(to_closest_sq) > 1e-24)
+        {
+          const FT inv_len = FT(1.0 / std::sqrt(CGAL::to_double(to_closest_sq)));
+          const Vector_3 unit_dir = scale(to_closest, inv_len);
+          const Point_3 potential_outside_point =
+            translate(closest_pt, scale(unit_dir, FT(1.1) * m_offset));
+          std::cout << "potential_outside_point = " << potential_outside_point << std::endl;
+
+          Point_3 hit_from_ch;
+          const bool has_hit_from_ch =
+            m_oracle.first_intersection(ch_cc, potential_outside_point, hit_from_ch, m_offset);
+
+          if(has_hit_from_ch)
+          {
+            std::cout << "intersection found from ch_cc to potential_outside_point, using fallback" << std::endl;
+            force_fallback_face_pt = true;
+          }
+          else
+          {
+            std::cout << "no intersection found from ch_cc to potential_outside_point" << std::endl;
+
+            if(m_oracle.first_intersection(potential_outside_point, closest_pt, steiner_point, m_offset))
+            {
+              std::cout << "intersection found from potential_outside_point to closest_pt" << std::endl;
+              return true;
+            }
+            else
+            {
+              std::cout << "no intersection found from potential_outside_point to closest_pt, using fallback" << std::endl;
+              force_fallback_face_pt = true;
+            }
+          }
+        }
+        else
+        {
+          std::cout << "potential_outside_point not computed (neighbor_cc == closest_pt)" << std::endl;
+        }
+      }
 
 // // #ifdef CGAL_AW3_DEBUG_STEINER_COMPUTATION
 //       if(has_cp_info)
@@ -1805,7 +1851,7 @@ bool is_traversable(const Facet& f) const
 
 
       // next try to approximate furthest point on face --> when moving from concave edge to this point, this is a really rough approximation for concave edge on offset surface
-      Point_3 face_pt = has_bisector_face_intersection
+      Point_3 face_pt = (!force_fallback_face_pt && has_bisector_face_intersection)
                           ? bisector_face_intersection
                           : furthest_point_on_triangle(pts[0], pts[1], pts[2]); // fallback
       // Point_3 face_pt = mid_pt_of_triangle(pts[0], pts[1], pts[2]); // try just face mid
