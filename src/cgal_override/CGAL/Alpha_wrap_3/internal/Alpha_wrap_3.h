@@ -1632,47 +1632,130 @@ bool is_traversable(const Facet& f) const
               bisec_dir = w1_unit;
             }
 
-            // Intersect line L(t)=closest_pt + t*bisec_dir with plane of face f
-            const Vector_3 f01 = vector(pts[0], pts[1]);
-            const Vector_3 f02 = vector(pts[0], pts[2]);
-            const Vector_3 nf = cross(f01, f02);
-
-            const FT denom = dot(bisec_dir, nf);
-            if(CGAL::abs(CGAL::to_double(denom)) > 1e-12)
+            // Bisector plane: contains shared edge AB and bisector direction.
+            const Vector_3 bisector_plane_normal = cross(edge_unit, bisec_dir);
+            Vector_3 bisector_plane_normal_unit;
+            if(safe_normalize(bisector_plane_normal, bisector_plane_normal_unit))
             {
-              const FT t = dot(vector(closest_pt, pts[0]), nf) / denom;
-              const Point_3 X = translate(closest_pt, scale(bisec_dir, t));
-
-              // inside-triangle test on face f by barycentric coordinates
-              const Vector_3 a = f01;
-              const Vector_3 b = f02;
-              const Vector_3 c = vector(pts[0], X);
-
-              const FT aa = dot(a, a);
-              const FT ab = dot(a, b);
-              const FT bb = dot(b, b);
-              const FT ac = dot(a, c);
-              const FT bc = dot(b, c);
-              const FT delta = aa * bb - ab * ab;
-
-              if(CGAL::abs(CGAL::to_double(delta)) > 1e-16)
-              {
-                const FT u = (bb * ac - ab * bc) / delta;
-                const FT v = (aa * bc - ab * ac) / delta;
-                const FT eps = FT(1e-10);
-                const bool inside = (u >= -eps && v >= -eps && (u + v) <= FT(1) + eps);
-
-                if(inside)
+              const auto signed_to_bisector_plane =
+                [&](const Point_3& p) -> FT
                 {
-                  bisector_face_intersection = X;
-                  has_bisector_face_intersection = true;
-                  if (has_bisector_face_intersection) {
-                    std::cout << "🍜🍜🍜has_bisector_face_intersection --> X = " << X << std::endl;
+                  return dot(bisector_plane_normal_unit, vector(A, p));
+                };
+
+              std::vector<Point_3> edge_intersections;
+              edge_intersections.reserve(3);
+
+              const FT e01_sq = sq_dist(pts[0], pts[1]);
+              const FT e12_sq = sq_dist(pts[1], pts[2]);
+              const FT e20_sq = sq_dist(pts[2], pts[0]);
+              const double face_scale_sq_d =
+                (std::max)(CGAL::to_double(e01_sq),
+                           (std::max)(CGAL::to_double(e12_sq),
+                                      CGAL::to_double(e20_sq)));
+              // Tolerance scaled by face size to treat near-vertex duplicate hits robustly.
+              const double same_pt_tol_sq_d =
+                (std::max)(1e-20, 1e-14 * face_scale_sq_d);
+
+              const auto add_unique_point =
+                [&](const Point_3& p)
+                {
+                  for(const Point_3& q : edge_intersections)
+                  {
+                    if(CGAL::to_double(sq_dist(p, q)) <= same_pt_tol_sq_d)
+                      return;
+                  }
+                  edge_intersections.push_back(p);
+                };
+
+              const auto intersect_edge_with_bisector_plane =
+                [&](const Point_3& p0, const Point_3& p1)
+                {
+                  const FT d0 = signed_to_bisector_plane(p0);
+                  const FT d1 = signed_to_bisector_plane(p1);
+                  const FT eps_d = FT(1e-12);
+
+                  const bool on0 = (CGAL::abs(CGAL::to_double(d0)) <= CGAL::to_double(eps_d));
+                  const bool on1 = (CGAL::abs(CGAL::to_double(d1)) <= CGAL::to_double(eps_d));
+
+                  if(on0 && on1)
+                  {
+                    // Edge lies in plane (degenerate case for our use): keep endpoints.
+                    add_unique_point(p0);
+                    add_unique_point(p1);
+                    return;
+                  }
+
+                  if(on0)
+                  {
+                    add_unique_point(p0);
+                    return;
+                  }
+
+                  if(on1)
+                  {
+                    add_unique_point(p1);
+                    return;
+                  }
+
+                  const bool different_sides =
+                    (CGAL::to_double(d0) < 0.0 && CGAL::to_double(d1) > 0.0) ||
+                    (CGAL::to_double(d0) > 0.0 && CGAL::to_double(d1) < 0.0);
+
+                  if(!different_sides)
+                    return;
+
+                  const FT t = d0 / (d0 - d1); // p0 + t*(p1-p0), with t in (0,1)
+                  const Point_3 ip = translate(p0, scale(vector(p0, p1), t));
+                  add_unique_point(ip);
+                };
+
+              // Intersections between bisector plane and the 3 edges of face f
+              intersect_edge_with_bisector_plane(pts[0], pts[1]);
+              intersect_edge_with_bisector_plane(pts[1], pts[2]);
+              intersect_edge_with_bisector_plane(pts[2], pts[0]);
+
+              if(edge_intersections.size() >= 2)
+              {
+                Point_3 i1 = edge_intersections[0];
+                Point_3 i2 = edge_intersections[1];
+
+                // If there are 3 distinct points (degenerate case), keep the farthest pair.
+                if(edge_intersections.size() > 2)
+                {
+                  FT best_sq = FT(-1);
+                  for(std::size_t i = 0; i < edge_intersections.size(); ++i)
+                  {
+                    for(std::size_t j = i + 1; j < edge_intersections.size(); ++j)
+                    {
+                      const FT d = sq_dist(edge_intersections[i], edge_intersections[j]);
+                      if(d > best_sq)
+                      {
+                        best_sq = d;
+                        i1 = edge_intersections[i];
+                        i2 = edge_intersections[j];
+                      }
+                    }
                   }
                 }
-                else {
-                  std::cout << "🍎🚃🚃🚃no intersection with face f" << std::endl;
+
+                if(CGAL::to_double(sq_dist(i1, i2)) <= same_pt_tol_sq_d)
+                {
+                  has_bisector_face_intersection = false;
+                  std::cout << "🍎🚃🚃🚃intersection 1 == intersection 2, using fallback" << std::endl;
                 }
+                else
+                {
+                  bisector_face_intersection = construct_midpoint(i1, i2);
+                  has_bisector_face_intersection = true;
+                  std::cout << "🍜🍜🍜has_bisector_face_intersection --> intersection 1 = "
+                            << i1 << " ; intersection 2 = " << i2
+                            << " ; which gives X = " << bisector_face_intersection << std::endl;
+                }
+              }
+              else
+              {
+                std::cout << "🍎🚃🚃🚃no intersection with face f" << std::endl;
               }
             }
           }
