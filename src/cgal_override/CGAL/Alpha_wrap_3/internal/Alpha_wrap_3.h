@@ -200,6 +200,7 @@ protected:
 
   FT m_alpha = FT(-1), m_sq_alpha = FT(-1);
   FT m_offset = FT(-1), m_sq_offset = FT(-1);
+  FT m_min_points_d = FT(-1);
 
   Seeds m_seeds;
 
@@ -1090,7 +1091,7 @@ bool far_enough_from_other_points(const Point_3& steiner_point) const {
       geom_traits().compute_squared_distance_3_object();
 
   for (Vertex_handle vh : m_tr.finite_vertex_handles()) {
-    double min_dist = 0.03;
+    double min_dist = m_min_points_d;
     double sq_min_dist = min_dist*min_dist;
     if (sq_dist(steiner_point, vh->point()) < sq_min_dist) {
       return false;
@@ -1118,20 +1119,18 @@ bool is_traversable(const Facet& f) const
         // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
       traversable = too_far_from_input(f);
       // trying out method to set a minimum distance to other points
-      if (traversable) {
-        const Cell_handle ch = f.first;
-        const Cell_handle nh = ch->neighbor(f.second);
-        Point_3 steiner_point;
-        const bool has_steiner_point = compute_steiner_point(ch, nh, steiner_point);
-        const bool is_far_enough = has_steiner_point && far_enough_from_other_points(steiner_point);
-
-        if (!is_far_enough) {
-          traversable = false;
-        }
-        if (!is_far_enough) {
-          std::cout << " -> too close to an existing point (< m_offset), keep non-traversable";
-        }
-      }
+      // if (traversable) {
+      //   const Cell_handle ch = f.first;
+      //   const Cell_handle nh = ch->neighbor(f.second);
+      //   Point_3 steiner_test_point;
+      //   const bool has_steiner_point = compute_steiner_point(ch, nh, steiner_test_point);
+      //   const bool is_far_enough = has_steiner_point && far_enough_from_other_points(steiner_test_point);
+      //
+      //   if (!is_far_enough) {
+      //     traversable = false;
+      //     // std::cout << " -> too close to an existing point (< m_offset), keep non-traversable" << std::endl;
+      //   }
+      // }
     }
 
     return traversable;
@@ -1321,9 +1320,10 @@ bool is_traversable(const Facet& f) const
   // }
 
       // choosing furthest edge mid point, leads to consecutive points, therefore, move point slightly towards edge mid
-      Vector_3 from_face_mid = vector(face_mid,edge_mid);
+      Vector_3 edge_to_centroid = vector(edge_mid, face_mid);
 
-      Point_3 face_pt = face_mid + 0.95*from_face_mid;
+  Point_3 face_pt = edge_mid + 0.05*edge_to_centroid;
+
   return face_pt;
 }
 
@@ -1487,24 +1487,31 @@ bool is_traversable(const Facet& f) const
   }
 
   // for small faces, use modified steiner point insertion
+  // ToDo ensure I here make a boolean if point is not too close; otherwise use normal alpha wrap insertion.
     Tetrahedron_with_outside_info<Geom_traits> tet(neighbor, geom_traits());
     if(m_oracle.do_intersect(tet))
   {
+      // next try to approximate furthest point on face --> when moving from concave edge to this point, this is a really rough approximation for concave edge on offset surface
+      Point_3 face_pt = furthest_point_on_triangle(pts[0], pts[1], pts[2]); // optimal point on triangle
+      Point_3 face_mid = mid_pt_of_triangle(pts[0], pts[1], pts[2]); // try just face mid
+      // Point_3 face_pt = ch_cc; // or just use ch_cc
   // Find the closest point from neighboring tetrahedron midpoint on input (= inside offset)
       // In case of concave edge (higher change for small triangles), this has a potential to snap to the concave edge
+
   const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
   CGAL_assertion(closest_pt != neighbor_cc);
 
-
-      // next try to approximate furthest point on face --> when moving from concave edge to this point, this is a really rough approximation for concave edge on offset surface
-      Point_3 face_pt = furthest_point_on_triangle(pts[0], pts[1], pts[2]); // optimal point on triangle
-      // Point_3 face_pt = mid_pt_of_triangle(pts[0], pts[1], pts[2]); // try just face mid
-      // Point_3 face_pt = ch_cc; // or just use ch_cc
-
       // if moving from closest point on input (from neighbor_cc) to furthest triangle point, gives an intersection, first intersection is steiner point
-  if(m_oracle.first_intersection(face_pt, closest_pt, steiner_point, m_offset))
+  Point_3 steiner_test_point;
+  if(m_oracle.first_intersection(face_pt, closest_pt, steiner_test_point, m_offset))
   {
-    return true;
+    if (far_enough_from_other_points(steiner_test_point)) {
+      // std::cout << "👍🏼steiner_test_point " << steiner_test_point << " , is far enough from other points!" << std::endl;
+      steiner_point = steiner_test_point;
+      return true;
+    }
+    // std::cout << "🤯not far enough, so using normal steiner point placement!" << std::endl;
+    return compute_steiner_point_normal(ch, neighbor, steiner_point);
   }
   }
   // if no steiner point is successfully computed, compute it using the normal way
@@ -1748,6 +1755,7 @@ private:
     m_sq_alpha = square(m_alpha);
     m_offset = FT(offset);
     m_sq_offset = square(m_offset);
+    m_min_points_d = (std::min)(m_alpha, m_offset);
 
     const Bbox_3 ib = m_oracle.bbox();
     m_xmid = 0.5 * (ib.xmin() + ib.xmax());

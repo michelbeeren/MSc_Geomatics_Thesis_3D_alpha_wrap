@@ -23,6 +23,7 @@
 #include <CGAL/boost/graph/helpers.h>
 #include <CGAL/IO/Color.h>
 #include <filesystem>
+#include <algorithm>
 #include <CGAL/Polyhedron_3.h>
 #include <CGAL/IO/read_points.h>
 // #include <CGAL/Polyhedron_traits_3.h> // Uncomment if needed, but this is often not required for basic operations
@@ -490,7 +491,11 @@ Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_al
         std::cout << "📝 Writing 📝 to: " << output_ << std::endl;
         CGAL::IO::write_polygon_mesh(output_, wrap, CGAL::parameters::stream_precision(25));
         double dmin = smallest_point_to_point_distance_from_off(output_);
-        std::cout << "min distance between output points = " << dmin << std::endl;
+        double lower_bound_tr_sphere = (max_d_to_input_in_offsets_-1)*offset;
+        // std::cout << "alpha = " << alpha << " , offset = " << offset << " , Beeren method lowest = " << lower_bound_tr_sphere << std::endl;
+        double lower_bound = std::min({lower_bound_tr_sphere, offset, alpha});
+        // std::cout << "prooven lower bound = " << lower_bound << std::endl;
+        std::cout << "min distance between output points = " << dmin << " => " << lower_bound << " (proven lower bound)" << std::endl;
     }
 
     // ----------------------------- validate the output ------------------------------
