@@ -26,8 +26,13 @@ add_executable(alpha_wrap
         src/MAT.h
         src/hausdorff.cpp
         src/hausdorff.h
+)
+
+add_executable(alpha_wrap_cli
         src/cli/alpha_wrap_cli.cpp
         src/cli/helper_files/alpha_wrapping.h
+        src/cli/helper_files/val3dity.h
+        src/cli/helper_files/hausdorff.h
 )
 
 # EXTRA HARD FORCE: put -Ioverride explicitly at the start of compile flags --> probably not necessary
@@ -37,6 +42,7 @@ add_executable(alpha_wrap
 #)
 
 target_link_libraries(alpha_wrap PRIVATE CGAL::CGAL)
+target_link_libraries(alpha_wrap_cli PRIVATE CGAL::CGAL)
 
 # ---------------- val3dity ----------------
 find_program(VAL3DITY_EXECUTABLE val3dity /opt/homebrew/bin)
@@ -46,6 +52,9 @@ if (NOT VAL3DITY_EXECUTABLE)
 endif()
 
 target_compile_definitions(alpha_wrap PRIVATE
+        VAL3DITY_PATH="${VAL3DITY_EXECUTABLE}"
+)
+target_compile_definitions(alpha_wrap_cli PRIVATE
         VAL3DITY_PATH="${VAL3DITY_EXECUTABLE}"
 )
 

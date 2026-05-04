@@ -1,160 +1,90 @@
-//
-// Created by Michel Beeren on 04/05/2026.
-//
+#include "helper_files/alpha_wrapping.h"
+#include "helper_files/hausdorff.h"
+#include "helper_files/val3dity.h"
 
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Surface_mesh.h>
-#include <CGAL/alpha_wrap_3.h>
-#include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
-#include <CGAL/Real_timer.h>
-#include <CGAL/AABB_tree.h>
-#include <CGAL/AABB_face_graph_triangle_primitive.h>
-#include <CGAL/AABB_traits.h>
+#include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <string>
-#include <fstream>
-
-namespace PMP = CGAL::Polygon_mesh_processing;
-using K = CGAL::Exact_predicates_inexact_constructions_kernel;
-using Point_3 = K::Point_3;
-using Vector_3 = K::Vector_3;
-using Mesh = CGAL::Surface_mesh<Point_3>;
-using face_descriptor = Mesh::Face_index;
-using Ray_3       = K::Ray_3;
-using Segment_3   = K::Segment_3;
-using Primitive   = CGAL::AABB_face_graph_triangle_primitive<Mesh>;
-using AABB_traits = CGAL::AABB_traits<K, Primitive>;
-using Tree        = CGAL::AABB_tree<AABB_traits>;
 
 struct Arguments
 {
-    std::string input_path;
-    std::string output_path;
-    double alpha = 0.0;
-    double offset = 0.0;
-    double tau = 0.0;
+  std::string input_path;
+  std::string output_path;
+  double alpha = 0.0;
+  double offset = 0.0;
+  double tau = 0.0;
 };
 
-// ToDo what input types are possible???
-void print_usage(const char* modified_3d_alpha_wrapping)
+void print_usage(const char* executable)
 {
-    std::cerr
-      << "Usage:\n"
-      << "  " << modified_3d_alpha_wrapping
-      << " <input> <output_mesh> --alpha <value> --offset <value> --tau <value>\n\n"
-      << "Example:\n"
-      << "  " << modified_3d_alpha_wrapping
-      << " input.off output.off --alpha 0.03 --offset 0.005 --tau 0.5\n";
+  std::cerr << "Usage:\n"
+            << "  " << executable << " <input_path> <output_path> <alpha> <offset> <tau>\n\n"
+            << "Notes:\n"
+            << "  - alpha and offset are relative to the input bbox diagonal\n"
+            << "  - tau is max_distance_to_input_in_offsets and must be > 1.0\n";
 }
 
-bool parse_arguments(int argc, char** argv, Arguments& args)
+bool parse_arguments(const int argc, char** argv, Arguments& args)
 {
-    if(argc < 9)
-    {
-        return false;
-    }
+  if(argc != 6)
+    return false;
 
-    args.input_path = argv[1];
-    args.output_path = argv[2];
+  args.input_path = argv[1];
+  args.output_path = argv[2];
 
-    for(int i = 3; i < argc; ++i)
-    {
-        const std::string key = argv[i];
+  try
+  {
+    args.alpha = std::stod(argv[3]);
+    args.offset = std::stod(argv[4]);
+    args.tau = std::stod(argv[5]);
+  }
+  catch(const std::exception&)
+  {
+    return false;
+  }
 
-        if(key == "--alpha" && i + 1 < argc)
-        {
-            args.alpha = std::atof(argv[++i]);
-        }
-        else if(key == "--offset" && i + 1 < argc)
-        {
-            args.offset = std::atof(argv[++i]);
-        }
-        else if(key == "--tau" && i + 1 < argc)
-        {
-            args.tau = std::atof(argv[++i]);
-        }
-        else
-        {
-            std::cerr << "Unknown or incomplete argument: " << key << "\n";
-            return false;
-        }
-    }
-
-    if(args.alpha <= 0.0)
-    {
-        std::cerr << "Error: alpha must be positive.\n";
-        return false;
-    }
-
-    if(args.offset <= 0.0)
-    {
-        std::cerr << "Error: offset must be positive.\n";
-        return false;
-    }
-
-    if(args.tau <= 1.0)
-    {
-        std::cerr << "Error: tau must be higher than 1.\n";
-        return false;
-    }
-
-    return true;
+  return true;
 }
-
 
 int main(int argc, char** argv)
 {
-    Arguments args;
+  Arguments args;
+  if(!parse_arguments(argc, argv, args))
+  {
+    print_usage(argv[0]);
+    return EXIT_FAILURE;
+  }
 
-    if(!parse_arguments(argc, argv, args))
-    {
-        print_usage(argv[0]);
-        return EXIT_FAILURE;
-    }
+  try
+  {
+    const cli_helpers::Wrap_request request{
+        args.input_path,
+        args.alpha,
+        args.offset,
+        args.tau};
 
-    Mesh input_mesh;
+    cli_helpers::Wrap_result result = cli_helpers::run_alpha_wrap(request);
 
-    std::cout << "Reading input mesh: " << args.input_path << "\n";
-
-    if(!CGAL::IO::read_polygon_mesh(args.input_path, input_mesh))
-    {
-        std::cerr << "Error: could not read input mesh.\n";
-        return EXIT_FAILURE;
-    }
-
-    if(input_mesh.is_empty())
-    {
-        std::cerr << "Error: input mesh is empty.\n";
-        return EXIT_FAILURE;
-    }
-
-    Mesh wrap_mesh;
-
-    std::cout << "Running modified alpha wrap...\n";
-    std::cout << "  alpha  = " << args.alpha << "\n";
-    std::cout << "  offset = " << args.offset << "\n";
-    std::cout << "  tau    = " << args.tau << "\n";
-
-    // Replace this call with the exact signature of your modified function.
-    //
-    // Option A: if you added a tau overload:
-    CGAL::alpha_wrap_3(input_mesh, args.alpha, args.offset, args.tau, wrap_mesh);
-
-    // Option B: if your modified algorithm still uses the original CGAL signature,
-    // then use this instead:
-    //
-    // CGAL::alpha_wrap_3(input_mesh, args.alpha, args.offset, wrap_mesh);
-
+    std::cout << "Wrap result: " << num_vertices(result.wrap_mesh) << " vertices, "
+              << num_faces(result.wrap_mesh) << " faces\n";
     std::cout << "Writing output mesh: " << args.output_path << "\n";
-
-    if(!CGAL::IO::write_polygon_mesh(args.output_path, wrap_mesh,
-                                     CGAL::parameters::stream_precision(17)))
+    if(!cli_helpers::write_output_mesh(args.output_path, result.wrap_mesh))
     {
-        std::cerr << "Error: could not write output mesh.\n";
-        return EXIT_FAILURE;
+      std::cerr << "Error: could not write output mesh.\n";
+      return EXIT_FAILURE;
     }
+
+    const bool is_valid = cli_helpers::valid_mesh_boolean(result.wrap_mesh);
+    if(!is_valid)
+      std::cerr << "Warning: output mesh did not pass validation.\n";
 
     std::cout << "Done.\n";
-
     return EXIT_SUCCESS;
+  }
+  catch(const std::exception& e)
+  {
+    std::cerr << "Error: " << e.what() << "\n";
+    return EXIT_FAILURE;
+  }
 }

@@ -1544,6 +1544,15 @@ private:
     return !m_oracle.do_intersect(tet);
 }
 
+  bool is_cell_circumcenter_in_offset(const Cell_handle ch) const
+  {
+    CGAL_precondition(!m_tr.is_infinite(ch));
+    typename Geom_traits::Construct_ball_3 ball = geom_traits().construct_ball_3_object();
+    const Point_3& ch_cc = circumcenter(ch);
+    const Ball_3 ch_cc_offset_ball = ball(ch_cc, m_sq_offset);
+    return m_oracle.do_intersect(ch_cc_offset_ball);
+  }
+
   void carve_through_gate(const Cell_handle ch,
                         const int s,
                         const Cell_handle nh)
@@ -1627,8 +1636,11 @@ public:
     }
 
     if (is_empty_cell(nh)) {
-      // std::cout << "🧟🧟🧟face is NOT traversable, but neighbor cell IS empty!🧟🧟🧟" << std::endl;
-      return Facet_status::IS_ZOMBIE_CELL;
+      // Keep the CGAL invariant: outside-cell circumcenters must stay outside the offset.
+      // If we carve an empty cell whose circumcenter is in the offset, later Steiner
+      // computations can hit assertion failures.
+      if(!is_cell_circumcenter_in_offset(nh))
+        return Facet_status::IS_ZOMBIE_CELL;
     }
 
         // std::cout << "👼🏼👼🏼👼🏼face is NOT traversable, and neighbor cell contains input!👼🏼👼🏼👼🏼" << std::endl;
