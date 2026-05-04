@@ -201,6 +201,7 @@ protected:
   FT m_alpha = FT(-1), m_sq_alpha = FT(-1);
   FT m_offset = FT(-1), m_sq_offset = FT(-1);
   FT m_min_points_d = FT(-1);
+  FT m_lower_bound_tau = FT(-1);
 
   Seeds m_seeds;
 
@@ -1487,7 +1488,7 @@ bool is_traversable(const Facet& f) const
     if (!mod_steiner_computation) {
       return compute_steiner_point_normal(ch, neighbor, steiner_point);
     }
-  // else use modified implementation
+  // else use modified implementation --> with this method, for many cases still the 'compute_steiner_point_normal' is used
   return compute_steiner_point_modified(ch, neighbor, steiner_point);
   }
 
@@ -1712,7 +1713,8 @@ private:
     m_sq_alpha = square(m_alpha);
     m_offset = FT(offset);
     m_sq_offset = square(m_offset);
-    m_min_points_d = (std::min)(m_alpha, m_offset);
+    m_lower_bound_tau = (m_max_distance_to_input_in_offsets-1)*m_offset;
+    m_min_points_d = (std::min)((std::min)(m_alpha, m_offset), m_lower_bound_tau);
 
     const Bbox_3 ib = m_oracle.bbox();
     m_xmid = 0.5 * (ib.xmin() + ib.xmax());
