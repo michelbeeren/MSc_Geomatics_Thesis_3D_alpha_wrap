@@ -1265,6 +1265,7 @@ bool is_traversable(const Facet& f) const
   Point_3 edge_mid20 = construct_midpoint(pt3, pt1);
 
       // ToDo; make a better approximation for furthest point on triangle
+  // ToDo: Ensure this furthest distance is at least offset away from input, otherwise steiner points can be on inner structures
   // // compute optimal points on each edge
   // Point_3 p_opt01 = edge_mid01;
   // Point_3 p_opt12 = edge_mid12;
@@ -1434,7 +1435,6 @@ bool is_traversable(const Facet& f) const
     auto sq_length = geom_traits().compute_squared_length_3_object();
 
     const Point_3& neighbor_cc = circumcenter(neighbor);
-    const Point_3& ch_cc = circumcenter(ch);
     const Ball_3 neighbor_cc_offset_ball = ball(neighbor_cc, m_sq_offset);
     const bool is_neighbor_cc_in_offset = m_oracle.do_intersect(neighbor_cc_offset_ball);
 
@@ -1501,6 +1501,13 @@ bool is_traversable(const Facet& f) const
   const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
   CGAL_assertion(closest_pt != neighbor_cc);
 
+      // Guard against a degenerate segment: first_intersection() normalizes (t - s).
+      // If face_pt and closest_pt are (near-)identical, that normalization can divide by zero.
+      const FT sq_face_to_closest = sq_dist(face_pt, closest_pt);
+      const FT min_sq_face_to_closest = square(FT(1e-12) * m_offset);
+      if(sq_face_to_closest <= min_sq_face_to_closest)
+        return compute_steiner_point_normal(ch, neighbor, steiner_point);
+
       // if moving from closest point on input (from neighbor_cc) to furthest triangle point, gives an intersection, first intersection is steiner point
   Point_3 steiner_test_point;
   if(m_oracle.first_intersection(face_pt, closest_pt, steiner_test_point, m_offset))
@@ -1523,6 +1530,7 @@ bool is_traversable(const Facet& f) const
                              const Cell_handle neighbor,
                              Point_3& steiner_point) const
   {
+    // return compute_steiner_point_normal(ch, neighbor, steiner_point);
     const bool mod_steiner_computation = m_check_face_distance_from_input; // only use modified steiner point placement if parameter max_distance_to_input_in_offsets is used
 
   // use normal steiner computation
@@ -1643,10 +1651,6 @@ public:
       }
     }
 
-    if (is_empty_cell(nh)) {
-      // std::cout << "🧟🧟🧟face is NOT traversable, but neighbor cell IS empty!🧟🧟🧟" << std::endl;
-      return Facet_status::IS_ZOMBIE_CELL;
-    }
 
     // skip if f min empty sphere radius is smaller than alpha
     if(is_traversable(f))
@@ -1657,7 +1661,10 @@ public:
       return Facet_status::TRAVERSABLE;
     }
 
-
+    if (is_empty_cell(nh)) {
+      // std::cout << "🧟🧟🧟face is NOT traversable, but neighbor cell IS empty!🧟🧟🧟" << std::endl;
+      return Facet_status::IS_ZOMBIE_CELL;
+    }
 
         // std::cout << "👼🏼👼🏼👼🏼face is NOT traversable, and neighbor cell contains input!👼🏼👼🏼👼🏼" << std::endl;
 

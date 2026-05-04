@@ -28,19 +28,38 @@
 #include <CGAL/IO/read_points.h>
 // #include <CGAL/Polyhedron_traits_3.h> // Uncomment if needed, but this is often not required for basic operations
 #include <filesystem>
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Surface_mesh.h>
+#include <cmath>
+
+#include <CGAL/Polygon_mesh_processing/distance.h>
+#include <CGAL/Polygon_mesh_processing/triangulate_faces.h>
+#include <CGAL/boost/graph/helpers.h>
+
+#include <CGAL/AABB_tree.h>
+#include <CGAL/AABB_traits.h>
+#include <CGAL/AABB_face_graph_triangle_primitive.h>
+
+#include <vector>
+#include <algorithm>
+#include <stdexcept>
 
 namespace PMP = CGAL::Polygon_mesh_processing;
+
 using K = CGAL::Exact_predicates_inexact_constructions_kernel;
 using Point_3 = K::Point_3;
 using Mesh = CGAL::Surface_mesh<Point_3>;
+
 using Point_container = std::vector<Point_3>;
 using Vector_3 = K::Vector_3;
 using Segment_3 = K::Segment_3;
-using Primitive   = CGAL::AABB_face_graph_triangle_primitive<Mesh>;
+using Ray_3 = K::Ray_3;
+
+using Primitive = CGAL::AABB_face_graph_triangle_primitive<Mesh>;
 using AABB_traits = CGAL::AABB_traits<K, Primitive>;
-using Tree        = CGAL::AABB_tree<AABB_traits>;
+using Tree = CGAL::AABB_tree<AABB_traits>;
+
 using face_descriptor = Mesh::Face_index;
-using Ray_3   = K::Ray_3;
 
 #include "alpha_wrap.h"
 #include "val3dity.h"
@@ -441,6 +460,24 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
     return wrap;
 }
 
+double upper_bound_max_d_to_input(const double alpha, const double offset, Mesh& input, Mesh& output, double tau) {
+    double upper_bound_max_d_to_input = 0.0;
+    double t = (tau-1)*offset;
+    if (t >= 0. && t <= (4./15.)*alpha) {
+        upper_bound_max_d_to_input = offset + (2./3.)*alpha + t/2.;
+    }
+    else if (t > (4./15.)*alpha && t < (2./3.)*alpha) {
+        upper_bound_max_d_to_input = offset + (3*alpha + 9*t + std::sqrt(10*alpha*alpha - (alpha + 3*t)*(alpha + 3*t)))/10.;
+    }
+    else if (t >= (2./3.)*alpha) {
+        upper_bound_max_d_to_input = offset + alpha;
+    }
+
+    double d_output_to_input = PMP::approximate_Hausdorff_distance<CGAL::Sequential_tag>( output, input, CGAL::parameters::number_of_points_per_area_unit(100));
+    std::cout << "Hausdorff distance = " << d_output_to_input << std::endl;
+    return upper_bound_max_d_to_input;
+}
+
 Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool max_d_in_offets, const double max_d, bool write_out_, bool validate) {
     Mesh& mesh_ = data_.mesh;
     double max_d_to_input_in_offsets_ = max_d;
@@ -473,6 +510,7 @@ Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_al
 
     std::string output_ = generate_output_name(filename, relative_alpha_, relative_offset_);
     // Write the output mesh
+    double upper_bound = alpha + offset;
     if (write_out_) {
         std::filesystem::path p(output_);
         std::filesystem::create_directories(p.parent_path());
@@ -487,6 +525,14 @@ Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_al
             oss << std::fixed << std::setprecision(1) << max_d_to_input_in_offsets_;
             const std::string refined = oss.str();
             output_ += "_refined=" + refined + ".off";
+            upper_bound = upper_bound_max_d_to_input(alpha, offset, mesh_, wrap, max_d_to_input_in_offsets_);
+            std::cout << "upper_bound = " << upper_bound << std::endl;
+            double g = max_d_to_input_in_offsets_*offset;
+            std::cout << "g = " << g << std::endl;
+        }
+        if (!max_d_in_offets) {
+            upper_bound_max_d_to_input(alpha, offset, mesh_, wrap, max_d_in_offets);
+            std::cout << "upper_bound = " << upper_bound << std::endl;
         }
         std::cout << "📝 Writing 📝 to: " << output_ << std::endl;
         CGAL::IO::write_polygon_mesh(output_, wrap, CGAL::parameters::stream_precision(25));
