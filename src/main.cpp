@@ -46,7 +46,7 @@ int main(int argc, char** argv)
     std::cout << "------------------------------------------------------------" << std::endl;
   std::cout << "Reading input: " << filename << std::endl;
 
-  const double relative_alpha = 80; //2000. //20. //1000.
+  const double relative_alpha = 40; //2000. //20. //1000.
   const double relative_offset = 8000.; // 7000. //600. //12000.
 
   bool beeren_method = true;

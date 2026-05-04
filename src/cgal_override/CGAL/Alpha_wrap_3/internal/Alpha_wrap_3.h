@@ -1100,6 +1100,21 @@ bool too_far_from_input(const Facet& f) const {
   return sq_dist(p, nv->point()) >= sq_min;
 }
 
+  // check if a candidate Steiner point is at least m_offset away from existing vertices
+  bool far_enough_from_other_points2(const Point_3& steiner_point) const {
+  const typename Geom_traits::Compute_squared_distance_3 sq_dist =
+      geom_traits().compute_squared_distance_3_object();
+
+  for (Vertex_handle vh : m_tr.finite_vertex_handles()) {
+    double min_dist = m_min_points_d;
+    double sq_min_dist = min_dist*min_dist;
+    if (sq_dist(steiner_point, vh->point()) < sq_min_dist) {
+      return false;
+    }
+  }
+  return true;
+}
+
   // function to check if a face is traversible
 bool is_traversable(const Facet& f) const
 {

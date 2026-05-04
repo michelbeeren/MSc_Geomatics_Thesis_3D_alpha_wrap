@@ -26,6 +26,8 @@ add_executable(alpha_wrap
         src/MAT.h
         src/hausdorff.cpp
         src/hausdorff.h
+        src/cli/alpha_wrap_cli.cpp
+        src/cli/helper_files/alpha_wrapping.h
 )
 
 # EXTRA HARD FORCE: put -Ioverride explicitly at the start of compile flags --> probably not necessary
