@@ -1086,19 +1086,18 @@ bool too_far_from_input(const Facet& f) const {
   return false;
 }
 
-  // check if a candidate Steiner point is at least m_offset away from existing vertices
-bool far_enough_from_other_points(const Point_3& steiner_point) const {
-  const typename Geom_traits::Compute_squared_distance_3 sq_dist =
-      geom_traits().compute_squared_distance_3_object();
+  bool far_enough_from_other_points(const Point_3& p) const {
+  if (m_tr.number_of_vertices() == 0) return true;
 
-  for (Vertex_handle vh : m_tr.finite_vertex_handles()) {
-    double min_dist = m_min_points_d;
-    double sq_min_dist = min_dist*min_dist;
-    if (sq_dist(steiner_point, vh->point()) < sq_min_dist) {
-      return false;
-    }
-  }
-  return true;
+  const auto sq_dist = geom_traits().compute_squared_distance_3_object();
+  const FT sq_min = CGAL::square(m_min_points_d);
+
+// 1. locate(p) finds a cell near/containing p.
+// 2. It picks the closest vertex among that cell’s 4 vertices.
+// 3. It does a local descent on the Delaunay graph: look at adjacent vertices, move to a closer one, repeat.
+// 4. Stop when no adjacent vertex is closer: that vertex is returned as nearest.
+  Vertex_handle nv = m_tr.nearest_vertex(p);
+  return sq_dist(p, nv->point()) >= sq_min;
 }
 
   // function to check if a face is traversible
