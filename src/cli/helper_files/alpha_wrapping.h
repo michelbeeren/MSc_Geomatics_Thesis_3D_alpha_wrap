@@ -168,7 +168,7 @@ inline Wrap_result run_alpha_wrap(const Wrap_request& request)
   std::cout << "Running beeren_method with alpha=" << alpha << ", offset=" << offset << ", tau=" << request.tau << "\n";
   return Wrap_result{kind, wrap_point_cloud(points, alpha, offset, request.tau), alpha, offset, points.size()};
 }
-
+  
 inline bool write_output_mesh(const std::string& output_path, const Mesh& mesh)
 {
   std::filesystem::path p(output_path);
