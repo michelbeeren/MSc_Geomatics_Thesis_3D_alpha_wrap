@@ -141,7 +141,7 @@ inline bool run_val3dity_and_check(const std::string& input_path,
   return report_is_valid(report_path);
 }
 
-inline bool valid_mesh_boolean(const Mesh& mesh)
+inline bool valid_mesh_boolean(const Mesh& mesh, const bool verbose = true)
 {
   const std::filesystem::path base = std::filesystem::temp_directory_path() / "alpha_wrap_cli_val3dity";
   std::filesystem::create_directories(base);
@@ -160,7 +160,8 @@ inline bool valid_mesh_boolean(const Mesh& mesh)
     mesh_is_valid = false;
   }
 
-  std::cout << (mesh_is_valid ? "Validation result: VALID\n" : "Validation result: INVALID\n");
+  if(verbose)
+    std::cout << (mesh_is_valid ? "Validation result: VALID\n" : "Validation result: INVALID\n");
   return mesh_is_valid;
 }
 

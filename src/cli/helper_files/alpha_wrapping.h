@@ -39,6 +39,7 @@ struct Wrap_request
   double relative_alpha = 0.0;
   double relative_offset = 0.0;
   double tau = 0.0;
+  bool use_noprmal_alpha_wrap = false;
 };
 
 struct Wrap_result
@@ -119,22 +120,38 @@ inline std::pair<double, double> compute_absolute_alpha_offset(const Point_conta
 inline Mesh wrap_triangle_mesh(const Mesh& input_mesh,
                                const double alpha,
                                const double offset,
-                               const double tau)
+                               const double tau,
+                               const bool use_noprmal_alpha_wrap = false)
 {
   Mesh wrap;
-  CGAL::alpha_wrap_3(input_mesh, alpha, offset, wrap,
-                     CGAL::parameters::max_distance_to_input_in_offsets(tau));
+  if(use_noprmal_alpha_wrap)
+  {
+    CGAL::alpha_wrap_3(input_mesh, alpha, offset, wrap);
+  }
+  else
+  {
+    CGAL::alpha_wrap_3(input_mesh, alpha, offset, wrap,
+                       CGAL::parameters::max_distance_to_input_in_offsets(tau));
+  }
   return wrap;
 }
 
 inline Mesh wrap_point_cloud(const Point_container& points,
                              const double alpha,
                              const double offset,
-                             const double tau)
+                             const double tau,
+                             const bool use_noprmal_alpha_wrap = false)
 {
   Mesh wrap;
-  CGAL::alpha_wrap_3(points, alpha, offset, wrap,
-                     CGAL::parameters::max_distance_to_input_in_offsets(tau));
+  if(use_noprmal_alpha_wrap)
+  {
+    CGAL::alpha_wrap_3(points, alpha, offset, wrap);
+  }
+  else
+  {
+    CGAL::alpha_wrap_3(points, alpha, offset, wrap,
+                       CGAL::parameters::max_distance_to_input_in_offsets(tau));
+  }
   return wrap;
 }
 
@@ -159,14 +176,18 @@ inline Wrap_result run_alpha_wrap(const Wrap_request& request)
     const auto [alpha, offset] = compute_absolute_alpha_offset(input_mesh, request.relative_alpha, request.relative_offset);
     std::cout << "Input type: triangle mesh (" << CGAL::num_faces(input_mesh) << " faces)\n";
     std::cout << "Running beeren_method with alpha=" << alpha << ", offset=" << offset << ", tau=" << request.tau << "\n";
-    return Wrap_result{kind, wrap_triangle_mesh(input_mesh, alpha, offset, request.tau), alpha, offset, CGAL::num_faces(input_mesh)};
+    return Wrap_result{kind,
+                       wrap_triangle_mesh(input_mesh, alpha, offset, request.tau, request.use_noprmal_alpha_wrap),
+                       alpha, offset, CGAL::num_faces(input_mesh)};
   }
 
   Point_container points = read_points_or_throw(request.input_path);
   const auto [alpha, offset] = compute_absolute_alpha_offset(points, request.relative_alpha, request.relative_offset);
   std::cout << "Input type: point cloud (" << points.size() << " points)\n";
   std::cout << "Running beeren_method with alpha=" << alpha << ", offset=" << offset << ", tau=" << request.tau << "\n";
-  return Wrap_result{kind, wrap_point_cloud(points, alpha, offset, request.tau), alpha, offset, points.size()};
+  return Wrap_result{kind,
+                     wrap_point_cloud(points, alpha, offset, request.tau, request.use_noprmal_alpha_wrap),
+                     alpha, offset, points.size()};
 }
   
 inline bool write_output_mesh(const std::string& output_path, const Mesh& mesh)
