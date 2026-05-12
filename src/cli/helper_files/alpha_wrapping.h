@@ -5,6 +5,7 @@
 #include <CGAL/IO/read_points.h>
 #include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
 #include <CGAL/Polygon_mesh_processing/bbox.h>
+#include <CGAL/Polygon_mesh_processing/triangulate_faces.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/alpha_wrap_3.h>
 #include <CGAL/boost/graph/helpers.h>
@@ -64,11 +65,23 @@ inline double bbox_diagonal(const CGAL::Bbox_3& bbox)
   return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-inline Mesh read_mesh_or_throw(const std::string& path)
+inline Mesh read_mesh_or_throw(const std::string& path, bool* was_triangulated = nullptr)
 {
   Mesh mesh;
-  if(!PMP::IO::read_polygon_mesh(path, mesh) || CGAL::is_empty(mesh) || !CGAL::is_triangle_mesh(mesh))
-    throw std::runtime_error("Failed to read a triangle mesh from: " + path);
+  if(!PMP::IO::read_polygon_mesh(path, mesh) || CGAL::is_empty(mesh))
+    throw std::runtime_error("Failed to read a polygon mesh from: " + path);
+
+  bool triangulated = false;
+  if(!CGAL::is_triangle_mesh(mesh))
+  {
+    triangulated = true;
+    PMP::triangulate_faces(mesh);
+    if(!CGAL::is_triangle_mesh(mesh))
+      throw std::runtime_error("Failed to triangulate mesh from: " + path);
+  }
+
+  if(was_triangulated)
+    *was_triangulated = triangulated;
 
   return mesh;
 }
@@ -86,7 +99,7 @@ inline Input_kind detect_input_kind(const std::string& filename)
 {
   {
     Mesh mesh;
-    if(PMP::IO::read_polygon_mesh(filename, mesh) && !CGAL::is_empty(mesh) && CGAL::is_triangle_mesh(mesh))
+    if(PMP::IO::read_polygon_mesh(filename, mesh) && !CGAL::is_empty(mesh))
       return Input_kind::Triangle_mesh;
   }
 
@@ -172,7 +185,10 @@ inline Wrap_result run_alpha_wrap(const Wrap_request& request)
 
   if(kind == Input_kind::Triangle_mesh)
   {
-    Mesh input_mesh = read_mesh_or_throw(request.input_path);
+    bool input_was_triangulated = false;
+    Mesh input_mesh = read_mesh_or_throw(request.input_path, &input_was_triangulated);
+    if(input_was_triangulated)
+      std::cout << "Input is not a triangle mesh. It will first be triangulated.\n";
     const auto [alpha, offset] = compute_absolute_alpha_offset(input_mesh, request.relative_alpha, request.relative_offset);
     std::cout << "Input type: triangle mesh (" << CGAL::num_faces(input_mesh) << " faces)\n";
     std::cout << "Running beeren_method with alpha=" << alpha << ", offset=" << offset << ", tau=" << request.tau << "\n";

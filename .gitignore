@@ -3,6 +3,7 @@ City4CFD/
 
 # Data files (do not commit)
 data/
+example_data/output/
 
 # Build artifacts
 build/

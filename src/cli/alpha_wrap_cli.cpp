@@ -227,7 +227,10 @@ Selective_wrap_result run_wrap_invalid_components_only(const Arguments& args)
   if(kind != cli_helpers::Input_kind::Triangle_mesh)
     throw std::runtime_error("Input is neither a valid triangle mesh nor a valid point cloud: " + args.input_path);
 
-  const cli_helpers::Mesh input_mesh = cli_helpers::read_mesh_or_throw(args.input_path);
+  bool input_was_triangulated = false;
+  const cli_helpers::Mesh input_mesh = cli_helpers::read_mesh_or_throw(args.input_path, &input_was_triangulated);
+  if(input_was_triangulated)
+    std::cout << "Input is not a triangle mesh. It will first be triangulated.\n";
   std::vector<cli_helpers::Mesh> components;
   PMP::split_connected_components(input_mesh, components);
 
@@ -523,11 +526,6 @@ void validate_and_repair_until_valid(cli_helpers::Mesh& mesh, const Arguments& a
 
     std::cout << "Validation result: [" << valid_components << "/" << total_components << "] VALID.\n";
 
-    if(invalid_components == 0)
-    {
-      std::cout << "Validation summary: everything is valid.\n";
-      return;
-    }
 
     std::cout << "Rewrapping " << invalid_components << " invalid connected components together\n";
     const cli_helpers::Mesh rewrapped_invalid =
@@ -578,7 +576,10 @@ int main(int argc, char** argv)
 
       if(kind == cli_helpers::Input_kind::Triangle_mesh)
       {
-        cli_helpers::Mesh input_mesh = cli_helpers::read_mesh_or_throw(args.input_path);
+        bool input_was_triangulated = false;
+        cli_helpers::Mesh input_mesh = cli_helpers::read_mesh_or_throw(args.input_path, &input_was_triangulated);
+        if(input_was_triangulated)
+          std::cout << "Input is not a triangle mesh. It will first be triangulated.\n";
         std::cout << "Input type: triangle mesh (" << CGAL::num_faces(input_mesh) << " faces)\n";
         std::cout << "Starting alpha wrapping with parameters alpha=" << args.alpha
                   << ", offset=" << args.offset << ", tau=" << args.tau << "\n";
