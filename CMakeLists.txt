@@ -45,18 +45,31 @@ target_link_libraries(alpha_wrap PRIVATE CGAL::CGAL)
 target_link_libraries(alpha_wrap_cli PRIVATE CGAL::CGAL)
 
 # ---------------- val3dity ----------------
-find_program(VAL3DITY_EXECUTABLE val3dity /opt/homebrew/bin)
+set(VAL3DITY_EXECUTABLE "" CACHE FILEPATH "Path to the val3dity executable")
 
-if (NOT VAL3DITY_EXECUTABLE)
-    message(FATAL_ERROR "val3dity not found at /opt/homebrew/bin")
+if(NOT VAL3DITY_EXECUTABLE)
+    find_program(VAL3DITY_EXECUTABLE
+            NAMES val3dity
+            HINTS /opt/homebrew/bin /usr/local/bin
+    )
 endif()
 
-target_compile_definitions(alpha_wrap PRIVATE
-        VAL3DITY_PATH="${VAL3DITY_EXECUTABLE}"
-)
-target_compile_definitions(alpha_wrap_cli PRIVATE
-        VAL3DITY_PATH="${VAL3DITY_EXECUTABLE}"
-)
+if(VAL3DITY_EXECUTABLE)
+    message(STATUS "Using val3dity executable: ${VAL3DITY_EXECUTABLE}")
+    target_compile_definitions(alpha_wrap PRIVATE
+            VAL3DITY_PATH="${VAL3DITY_EXECUTABLE}"
+    )
+    target_compile_definitions(alpha_wrap_cli PRIVATE
+            VAL3DITY_PATH="${VAL3DITY_EXECUTABLE}"
+    )
+else()
+    message(WARNING
+            "val3dity executable not found. Build will continue, but --validate and "
+            "--wrap_invalid_only require val3dity at runtime. "
+            "Configure with "
+            "-DVAL3DITY_EXECUTABLE=/path/to/val3dity to enable it."
+    )
+endif()
 
 # ---------------- masbcpp (ExternalProject) ----------------
 include(ExternalProject)

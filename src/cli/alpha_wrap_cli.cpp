@@ -526,6 +526,11 @@ void validate_and_repair_until_valid(cli_helpers::Mesh& mesh, const Arguments& a
 
     std::cout << "Validation result: [" << valid_components << "/" << total_components << "] VALID.\n";
 
+    if(invalid_components == 0)
+    {
+      std::cout << "Validation summary: everything is valid.\n";
+      return;
+    }
 
     std::cout << "Rewrapping " << invalid_components << " invalid connected components together\n";
     const cli_helpers::Mesh rewrapped_invalid =
@@ -557,6 +562,12 @@ int main(int argc, char** argv)
       throw std::runtime_error("offset must be a positive finite value.");
     if(!(std::isfinite(args.tau) && args.tau > 1.0))
       throw std::runtime_error("tau must be finite and strictly larger than 1.0.");
+    if((args.validate || args.wrap_invalid_only) && !cli_helpers::val3dity_available())
+      throw std::runtime_error(
+          "val3dity is required when using --validate or --wrap_invalid_only. "
+          "Make sure val3dity is available on PATH or configure with "
+          "-DVAL3DITY_EXECUTABLE=/path/to/val3dity."
+      );
 
     const auto wrap_start = std::chrono::steady_clock::now();
 

@@ -119,8 +119,20 @@ inline std::string val3dity_executable()
 #ifdef VAL3DITY_PATH
   return std::string(VAL3DITY_PATH);
 #else
-  return std::string("/opt/homebrew/bin/val3dity");
+  return std::string("val3dity");
 #endif
+}
+
+inline bool val3dity_available()
+{
+  const std::string exe = val3dity_executable();
+  if(exe.find('/') != std::string::npos || exe.find('\\') != std::string::npos)
+  {
+    return std::filesystem::exists(exe);
+  }
+
+  const std::string cmd = "command -v \"" + exe + "\" > /dev/null 2>&1";
+  return std::system(cmd.c_str()) == 0;
 }
 
 inline bool run_val3dity_and_check(const std::string& input_path,
