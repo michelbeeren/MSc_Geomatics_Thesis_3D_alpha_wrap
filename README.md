@@ -1,6 +1,25 @@
 # Thesis C++ - `alpha_wrap_cli`
 
-This repository contains `alpha_wrap_cli`, a command-line tool around CGAL alpha wrapping.
+This repository contains `alpha_wrap_cli`, a command-line tool implementing an extension of CGAL’s 3D Alpha Wrap algorithm.
+
+The extension adds a `tau`-based local refinement criterion and a vertex insertion strategy to better preserve sharp concave features. It applies extra refinement only where the generated wrap deviates too far from the input geometry, avoiding the need for a globally smaller `alpha`.
+
+The extension retains the guarantees of the original algorithm: termination, strict enclosure of the input, watertightness, orientability, and manifoldness.
+
+## Comparison
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="images/original_alpha_wrap.png" alt="Output of the original CGAL 3D Alpha Wrap algorithm" width="400"><br>
+      <sub>Original 3D Alpha Wrap</sub>
+    </td>
+    <td align="center">
+      <img src="images/extended_alpha_wrap.png" alt="Output of the extended Alpha Wrap algorithm" width="400"><br>
+      <sub>Extended Alpha Wrap (`tau` refinement)</sub>
+    </td>
+  </tr>
+</table>
 
 ## Clone
 
