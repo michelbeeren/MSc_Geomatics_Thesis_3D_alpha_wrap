@@ -1,1 +1,0 @@
-cmd='/opt/homebrew/bin/cmake;-DCMAKE_BUILD_TYPE=Release;-DCMAKE_PREFIX_PATH=/opt/homebrew;-GUnix Makefiles;-S;<SOURCE_DIR><SOURCE_SUBDIR>;-B;<BINARY_DIR>'
