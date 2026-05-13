@@ -2,6 +2,21 @@
 
 This repository contains `alpha_wrap_cli`, a command-line tool around CGAL alpha wrapping.
 
+## Clone
+
+`masbcpp` is included as a git submodule in `external/masbcpp`, so clone with submodules:
+
+```bash
+git clone --recurse-submodules <repo-url>
+```
+
+If you already cloned without submodules:
+
+```bash
+git submodule sync --recursive
+git submodule update --init --recursive
+```
+
 ## Prerequisites
 
 - CMake (>= 3.16)
@@ -17,6 +32,8 @@ From the repository root:
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --target alpha_wrap_cli
 ```
+
+Note: `alpha_wrap_cli` build still configures the full project, which expects the `external/masbcpp` submodule to be present.
 
 If `val3dity` is not on your `PATH`, provide it explicitly:
 
@@ -43,3 +60,18 @@ Example:
 - `--validate` runs val3dity-based validation and repair loops.
 - `--wrap_invalid_only` also uses val3dity to detect invalid groups before wrapping.
 - `--use_noprmal_alpha_wrap` uses the CGAL overload without the `tau` parameter.
+- Missing `val3dity` does not block compilation; it is required at runtime only when using `--validate` or `--wrap_invalid_only`.
+
+## Troubleshooting
+
+If CMake fails with an error like:
+
+`No download info given for 'masbcpp_ext' ... external/masbcpp ... is not an existing non-empty directory`
+
+initialize the submodule and reconfigure:
+
+```bash
+git submodule sync --recursive
+git submodule update --init --recursive
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+```
