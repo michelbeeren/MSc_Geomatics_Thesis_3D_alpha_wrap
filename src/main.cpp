@@ -35,6 +35,7 @@ using Tree        = CGAL::AABB_tree<AABB_traits>;
 #include "octree.h"
 #include "MAT.h"
 #include "hausdorff.h"
+#include "resuls.h"
 
 // ==================================================================================
 // ==================================== MAIN ========================================
@@ -53,6 +54,10 @@ int main(int argc, char** argv)
   const double max_d_to_input_in_offsets_ = 2;
   bool write_output_ = true;
   bool validate_ = true;
+  const bool run_statistics_sweeps = true; // set true to generate sweep CSV files
+
+  Mesh input_mesh_for_statistics;
+  bool has_input_mesh_for_statistics = false;
 
   const Input_kind kind = detect_input_kind(filename);
 
@@ -78,6 +83,8 @@ int main(int argc, char** argv)
     }
     auto data = mesh_input(filename, true, true); // set both to false if you do not want to compute normals + tree
     Mesh& mesh = data.mesh;
+    input_mesh_for_statistics = mesh;
+    has_input_mesh_for_statistics = true;
     auto face_normals = data.face_normals;
     std::cout << "face_normals.size = " << face_normals.size() << std::endl;
     Tree& tree = *data.tree;
@@ -87,6 +94,32 @@ int main(int argc, char** argv)
   else
   {
     throw std::runtime_error("Input is neither a valid triangle mesh nor a valid point cloud: " + filename);
+  }
+
+  if (run_statistics_sweeps) {
+    if (!has_input_mesh_for_statistics) {
+      throw std::runtime_error("Statistics sweeps require a triangle-mesh input.");
+    }
+
+    statistics_over_relative_alpha_to_csv(
+        {20.0, 40.0, 80.0, 160.0},
+        relative_offset, max_d_to_input_in_offsets_, input_mesh_for_statistics,
+        true, true, true, false,
+        "../data/Output/statistics/sweep_alpha.csv");
+
+    statistics_over_relative_offset_to_csv(
+        relative_alpha,
+        {500.0, 1000.0, 2000.0},
+        max_d_to_input_in_offsets_, input_mesh_for_statistics,
+        true, true, true, false,
+        "../data/Output/statistics/sweep_offset.csv");
+
+    statistics_over_tau_to_csv(
+        relative_alpha, relative_offset,
+        {1.2, 1.5, 2.0, 3.0},
+        input_mesh_for_statistics,
+        true, true, true, false,
+        "../data/Output/statistics/sweep_tau.csv");
   }
 
     // ------------------------------ALPHA WRAP INPUT---------------------------------------

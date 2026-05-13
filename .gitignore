@@ -6,6 +6,7 @@ data/
 example_data/output/
 
 # Build artifacts
+build-test/
 build/
 *.o
 *.out
@@ -23,3 +24,4 @@ CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 Makefile
+

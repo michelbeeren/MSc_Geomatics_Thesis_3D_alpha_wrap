@@ -26,6 +26,8 @@ add_executable(alpha_wrap
         src/MAT.h
         src/hausdorff.cpp
         src/hausdorff.h
+        src/resuls.cpp
+        src/resuls.h
 )
 
 add_executable(alpha_wrap_cli
