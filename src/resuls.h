@@ -27,6 +27,7 @@ struct Statistics_result
     double offset = 0.0;
     double tau = 0.0;
     double absolute_tau = 0.0;
+    double upper_bound = 0.0;
     double runtime = 0.0;
     std::size_t total_output_face_count = 0;
     std::size_t total_output_vertex_count = 0;

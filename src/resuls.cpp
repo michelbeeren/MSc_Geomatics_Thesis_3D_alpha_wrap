@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <limits>
 #include <numeric>
 #include <sstream>
@@ -163,7 +164,35 @@ int validate_per_connected_component_binary(const Mesh& mesh)
     return all_valid ? 1 : 0;
 }
 
+double compute_upper_bound(
+    const double alpha,
+    const double offset,
+    const double tau,
+    const bool use_beeren_method)
+{
+    if (!use_beeren_method) {
+        return alpha + offset;
+    }
+
+    const double g = (tau - 1.0) * offset;
+    const double c1 = (4.0 / 15.0) * alpha;
+    const double c2 = (2.0 / 3.0) * alpha;
+
+    if (g <= c1) {
+        return offset + (2.0 / 3.0) * alpha + 0.5 * g;
+    }
+
+    if (g <= c2) {
+        const double sqrt_term_arg = 10.0 * alpha * alpha - (alpha + 3.0 * g) * (alpha + 3.0 * g);
+        const double safe_sqrt_term = std::sqrt((std::max)(0.0, sqrt_term_arg));
+        return offset + (3.0 * alpha + 9.0 * g + safe_sqrt_term) / 10.0;
+    }
+
+    return offset + alpha;
+}
+
 constexpr std::size_t k_default_statistics_sample_count = 10000;
+constexpr std::size_t k_statistics_repetitions = 100;
 
 std::string optional_int_to_csv_cell(const std::optional<int>& value)
 {
@@ -196,7 +225,7 @@ std::string distances_to_csv_cell(const std::vector<double>& distances)
 
 void write_statistics_csv_header(std::ofstream& csv)
 {
-    csv << "relative_alpha,alpha,relative_offset,offset,tau,absolute_tau,runtime_s,"
+    csv << "relative_alpha,alpha,relative_offset,offset,tau,absolute_tau,upper_bound,runtime_s,"
            "total_output_face_count,total_output_vertex_count,valid_binary,"
            "directed_chamfer_distance,directed_hausdorff_distance,"
            "sampled_output_to_input_distances\n";
@@ -210,6 +239,7 @@ void append_statistics_csv_row(std::ofstream& csv, const Statistics_result& resu
         << result.offset << ','
         << result.tau << ','
         << result.absolute_tau << ','
+        << result.upper_bound << ','
         << result.runtime << ','
         << result.total_output_face_count << ','
         << result.total_output_vertex_count << ','
@@ -350,6 +380,7 @@ Statistics_result statisctics(
     result.alpha = diagonal / relative_alpha;
     result.offset = diagonal / relative_offset;
     result.absolute_tau = tau * result.offset;
+    result.upper_bound = compute_upper_bound(result.alpha, result.offset, tau, use_beeren_method);
 
     Mesh wrap;
     CGAL::Real_timer timer;
@@ -375,12 +406,24 @@ Statistics_result statisctics(
     }
 
     if (statistics) {
-        const std::vector<Point_3> sampled_output_points =
-            random_surface_samples_on_mesh(wrap, k_default_statistics_sample_count, false, false);
+        double chamfer_sum = 0.0;
+        double hausdorff_sum = 0.0;
 
-        result.sampled_output_to_input_distances = distances_to_mesh(sampled_output_points, input);
-        result.directed_chamfer_distance = mean_of_distances(result.sampled_output_to_input_distances);
-        result.directed_hausdorff_distance = max_of_distances(result.sampled_output_to_input_distances);
+        for (std::size_t repetition = 0; repetition < k_statistics_repetitions; ++repetition) {
+            const std::vector<Point_3> sampled_output_points =
+                random_surface_samples_on_mesh(wrap, k_default_statistics_sample_count, false, false);
+            std::vector<double> distances = distances_to_mesh(sampled_output_points, input);
+
+            chamfer_sum += mean_of_distances(distances);
+            hausdorff_sum += max_of_distances(distances);
+
+            if (repetition + 1 == k_statistics_repetitions) {
+                result.sampled_output_to_input_distances = std::move(distances);
+            }
+        }
+
+        result.directed_chamfer_distance = chamfer_sum / static_cast<double>(k_statistics_repetitions);
+        result.directed_hausdorff_distance = hausdorff_sum / static_cast<double>(k_statistics_repetitions);
     }
 
     if (write_output) {
@@ -444,6 +487,7 @@ void statistics_over_relative_alpha_to_csv(
             compute_statistics,
             write_output);
         append_statistics_csv_row(csv, result);
+        std::cout << "Ran stats for rel_alpha = " << relative_alpha << std::endl;
     }
 }
 
@@ -476,6 +520,7 @@ void statistics_over_relative_offset_to_csv(
             compute_statistics,
             write_output);
         append_statistics_csv_row(csv, result);
+        std::cout << "Ran stats for rel_offset = " << relative_offset << std::endl;
     }
 }
 
@@ -508,5 +553,6 @@ void statistics_over_tau_to_csv(
             compute_statistics,
             write_output);
         append_statistics_csv_row(csv, result);
+        std::cout << "Ran stats for tau = " << tau << std::endl;
     }
 }

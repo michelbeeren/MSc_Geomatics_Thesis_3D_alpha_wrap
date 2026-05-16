@@ -48,13 +48,13 @@ int main(int argc, char** argv)
   std::cout << "Reading input: " << filename << std::endl;
 
   const double relative_alpha = 20; //2000. //20. //1000.
-  const double relative_offset = 1000.; // 7000. //600. //12000.
+  const double relative_offset = 5000.; // 7000. //600. //12000.
 
   bool beeren_method = true;
   const double max_d_to_input_in_offsets_ = 2;
   bool write_output_ = true;
   bool validate_ = true;
-  const bool run_statistics_sweeps = true; // set true to generate sweep CSV files
+  const bool run_statistics_sweeps = false; // set true to generate sweep CSV files
 
   Mesh input_mesh_for_statistics;
   bool has_input_mesh_for_statistics = false;
@@ -101,25 +101,25 @@ int main(int argc, char** argv)
       throw std::runtime_error("Statistics sweeps require a triangle-mesh input.");
     }
 
-    statistics_over_relative_alpha_to_csv(
-        {20.0, 40.0, 80.0, 160.0},
-        relative_offset, max_d_to_input_in_offsets_, input_mesh_for_statistics,
-        true, true, true, false,
-        "../data/Output/statistics/sweep_alpha.csv");
+    // statistics_over_relative_alpha_to_csv(
+    //     {20.0, 25., 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100,110, 120,130, 140, 150, 160, 180, 200, 220, 240, 260},
+    //     relative_offset, max_d_to_input_in_offsets_, input_mesh_for_statistics,
+    //     false, false, true, false,
+    //     "../data/Output/statistics/sweep_alpha_o5000_n100.csv");
 
-    statistics_over_relative_offset_to_csv(
-        relative_alpha,
-        {500.0, 1000.0, 2000.0},
-        max_d_to_input_in_offsets_, input_mesh_for_statistics,
-        true, true, true, false,
-        "../data/Output/statistics/sweep_offset.csv");
+    // statistics_over_relative_offset_to_csv(
+    //     relative_alpha,
+    //     {500.0, 1000.0, 2000.0},
+    //     max_d_to_input_in_offsets_, input_mesh_for_statistics,
+    //     true, true, true, false,
+    //     "../data/Output/statistics/sweep_offset.csv");
 
-    statistics_over_tau_to_csv(
-        relative_alpha, relative_offset,
-        {1.2, 1.5, 2.0, 3.0},
-        input_mesh_for_statistics,
-        true, true, true, false,
-        "../data/Output/statistics/sweep_tau.csv");
+    // statistics_over_tau_to_csv(
+    //     relative_alpha, relative_offset,
+    //     {1.1, 1.11, 1.12, 1.13, 1.15, 1.17, 1.2, 1.25, 1.3, 1.4, 1.5, 1.7, 2.0, 2.5, 3.0, 3.5, 4.5, 4, 5, 5.5, 6, 7, 7.5, 8, 8.5, 9, 9.5, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 30, 35, 40, 50, 60, 70, 80, 100, 150, 200},
+    //     input_mesh_for_statistics,
+    //     false, true, true, false,
+    //     "../data/Output/statistics/sweep_tau_o5000.csv");
   }
 
     // ------------------------------ALPHA WRAP INPUT---------------------------------------
