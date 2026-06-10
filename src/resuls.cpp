@@ -12,6 +12,7 @@
 #include <iostream>
 #include <limits>
 #include <numeric>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 
@@ -23,6 +24,7 @@
 #include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
 #include <CGAL/Polygon_mesh_processing/connected_components.h>
 #include <CGAL/Polygon_mesh_processing/distance.h>
+#include <CGAL/Polygon_mesh_processing/intersection.h>
 #include <CGAL/Polygon_mesh_processing/triangulate_faces.h>
 
 #include "val3dity.h"
@@ -156,6 +158,15 @@ int validate_per_connected_component_binary(const Mesh& mesh)
         return 0;
     }
 
+    // Additional condition: disconnected components are not allowed to intersect.
+    for (std::size_t i = 0; i < components.size(); ++i) {
+        for (std::size_t j = i + 1; j < components.size(); ++j) {
+            if (PMP::do_intersect(components[i], components[j])) {
+                return 0;
+            }
+        }
+    }
+
     bool all_valid = true;
     for (const Mesh& component : components) {
         all_valid = all_valid && valid_mesh_boolean(component);
@@ -263,6 +274,35 @@ std::ofstream open_statistics_csv_or_throw(const std::string& csv_output_path)
 
     return csv;
 }
+
+K::Vector_3 random_unit_vector_3d(std::mt19937_64& rng)
+{
+    std::normal_distribution<double> normal_dist(0.0, 1.0);
+
+    while (true) {
+        const double x = normal_dist(rng);
+        const double y = normal_dist(rng);
+        const double z = normal_dist(rng);
+        const double norm = std::sqrt(x * x + y * y + z * z);
+
+        if (norm > 1e-12) {
+            return K::Vector_3(x / norm, y / norm, z / norm);
+        }
+    }
+}
+
+double sample_non_negative_shift_distance(
+    std::mt19937_64& rng,
+    const double mean_shift_distance,
+    const double stddev_shift_distance)
+{
+    if (stddev_shift_distance == 0.0) {
+        return (std::max)(0.0, mean_shift_distance);
+    }
+
+    std::normal_distribution<double> dist(mean_shift_distance, stddev_shift_distance);
+    return (std::max)(0.0, dist(rng));
+}
 } // namespace
 
 std::vector<Point_3> random_surface_samples_on_mesh(
@@ -352,6 +392,86 @@ std::size_t output_mesh_face_count(const Mesh& mesh)
     return num_faces(mesh);
 }
 
+Mesh exploder(
+    const std::string& input_off_path,
+    const double mean_shift_distance,
+    const double stddev_shift_distance)
+{
+    if (input_off_path.empty()) {
+        throw std::invalid_argument("input_off_path is empty");
+    }
+    if (!std::isfinite(mean_shift_distance)) {
+        throw std::invalid_argument("mean_shift_distance must be finite");
+    }
+    if (!std::isfinite(stddev_shift_distance) || stddev_shift_distance < 0.0) {
+        throw std::invalid_argument("stddev_shift_distance must be finite and >= 0");
+    }
+
+    Mesh input_mesh;
+    if (!PMP::IO::read_polygon_mesh(input_off_path, input_mesh) || CGAL::is_empty(input_mesh)) {
+        throw std::runtime_error("Failed to read input OFF mesh: " + input_off_path);
+    }
+
+    Mesh exploded_mesh;
+    std::mt19937_64 rng(std::random_device{}());
+
+    for (const Mesh::Face_index f : input_mesh.faces()) {
+        std::vector<Mesh::Vertex_index> new_face_vertices;
+        new_face_vertices.reserve(static_cast<std::size_t>(input_mesh.degree(f)));
+
+        for (const Mesh::Vertex_index v : CGAL::vertices_around_face(input_mesh.halfedge(f), input_mesh)) {
+            const Point_3& p = input_mesh.point(v);
+
+            const K::Vector_3 dir = random_unit_vector_3d(rng);
+            const double shift_distance =
+                sample_non_negative_shift_distance(rng, mean_shift_distance, stddev_shift_distance);
+            const K::Vector_3 shift = dir * shift_distance;
+
+            const Point_3 shifted_point = p + shift;
+            new_face_vertices.push_back(exploded_mesh.add_vertex(shifted_point));
+        }
+
+        if (new_face_vertices.size() < 3) {
+            continue;
+        }
+
+        if (exploded_mesh.add_face(new_face_vertices) == Mesh::null_face()) {
+            throw std::runtime_error("Failed to add exploded face while processing input mesh");
+        }
+    }
+
+    return exploded_mesh;
+}
+
+bool exploder_to_off(
+    const std::string& input_off_path,
+    const std::string& output_off_path,
+    const double mean_shift_distance,
+    const double stddev_shift_distance)
+{
+    if (output_off_path.empty()) {
+        throw std::invalid_argument("output_off_path is empty");
+    }
+
+    Mesh exploded_mesh = exploder(input_off_path, mean_shift_distance, stddev_shift_distance);
+
+    const std::filesystem::path out_path(output_off_path);
+    if (out_path.has_parent_path()) {
+        std::filesystem::create_directories(out_path.parent_path());
+    }
+
+    const bool ok = CGAL::IO::write_polygon_mesh(
+        output_off_path,
+        exploded_mesh,
+        CGAL::parameters::stream_precision(17));
+
+    if (!ok) {
+        throw std::runtime_error("Failed to write exploded OFF mesh: " + output_off_path);
+    }
+
+    return true;
+}
+
 Statistics_result statisctics(
     const double relative_alpha,
     const double relative_offset,
@@ -360,11 +480,15 @@ Statistics_result statisctics(
     const bool validate,
     const bool use_beeren_method,
     const bool statistics,
-    const bool write_output)
+    const bool write_output,
+    const std::size_t wrapping_time_repetitions)
 {
     ensure_positive_finite(relative_alpha, "relative_alpha");
     ensure_positive_finite(relative_offset, "relative_offset");
     ensure_positive_finite(tau, "tau");
+    if (wrapping_time_repetitions == 0) {
+        throw std::invalid_argument("wrapping_time_repetitions must be >= 1");
+    }
     if (use_beeren_method && (!std::isfinite(tau) || tau <= 1.0)) {
         throw std::invalid_argument("tau must be finite and > 1.0 when use_beeren_method=true");
     }
@@ -383,20 +507,33 @@ Statistics_result statisctics(
     result.upper_bound = compute_upper_bound(result.alpha, result.offset, tau, use_beeren_method);
 
     Mesh wrap;
-    CGAL::Real_timer timer;
-    timer.start();
-    if (use_beeren_method) {
-        CGAL::alpha_wrap_3(
-            input,
-            result.alpha,
-            result.offset,
-            wrap,
-            CGAL::parameters::max_distance_to_input_in_offsets(tau));
-    } else {
-        CGAL::alpha_wrap_3(input, result.alpha, result.offset, wrap);
+    double total_wrapping_time = 0.0;
+
+    for (std::size_t repetition = 0; repetition < wrapping_time_repetitions; ++repetition) {
+        Mesh current_wrap;
+        CGAL::Real_timer timer;
+        timer.start();
+
+        if (use_beeren_method) {
+            CGAL::alpha_wrap_3(
+                input,
+                result.alpha,
+                result.offset,
+                current_wrap,
+                CGAL::parameters::max_distance_to_input_in_offsets(tau));
+        } else {
+            CGAL::alpha_wrap_3(input, result.alpha, result.offset, current_wrap);
+        }
+
+        timer.stop();
+        total_wrapping_time += timer.time();
+
+        if (repetition + 1 == wrapping_time_repetitions) {
+            wrap = std::move(current_wrap);
+        }
     }
-    timer.stop();
-    result.runtime = timer.time();
+
+    result.runtime = total_wrapping_time / static_cast<double>(wrapping_time_repetitions);
 
     result.total_output_face_count = num_faces(wrap);
     result.total_output_vertex_count = num_vertices(wrap);
@@ -445,7 +582,8 @@ Statistics_result statistics(
     const bool validate,
     const bool use_beeren_method,
     const bool compute_statistics,
-    const bool write_output)
+    const bool write_output,
+    const std::size_t wrapping_time_repetitions)
 {
     return statisctics(
         relative_alpha,
@@ -455,7 +593,8 @@ Statistics_result statistics(
         validate,
         use_beeren_method,
         compute_statistics,
-        write_output);
+        write_output,
+        wrapping_time_repetitions);
 }
 
 void statistics_over_relative_alpha_to_csv(
@@ -467,7 +606,8 @@ void statistics_over_relative_alpha_to_csv(
     const bool use_beeren_method,
     const bool compute_statistics,
     const bool write_output,
-    const std::string& csv_output_path)
+    const std::string& csv_output_path,
+    const std::size_t wrapping_time_repetitions)
 {
     if (relative_alpha_values.empty()) {
         throw std::invalid_argument("relative_alpha_values is empty");
@@ -485,7 +625,8 @@ void statistics_over_relative_alpha_to_csv(
             validate,
             use_beeren_method,
             compute_statistics,
-            write_output);
+            write_output,
+            wrapping_time_repetitions);
         append_statistics_csv_row(csv, result);
         std::cout << "Ran stats for rel_alpha = " << relative_alpha << std::endl;
     }
@@ -500,7 +641,8 @@ void statistics_over_relative_offset_to_csv(
     const bool use_beeren_method,
     const bool compute_statistics,
     const bool write_output,
-    const std::string& csv_output_path)
+    const std::string& csv_output_path,
+    const std::size_t wrapping_time_repetitions)
 {
     if (relative_offset_values.empty()) {
         throw std::invalid_argument("relative_offset_values is empty");
@@ -518,7 +660,8 @@ void statistics_over_relative_offset_to_csv(
             validate,
             use_beeren_method,
             compute_statistics,
-            write_output);
+            write_output,
+            wrapping_time_repetitions);
         append_statistics_csv_row(csv, result);
         std::cout << "Ran stats for rel_offset = " << relative_offset << std::endl;
     }
@@ -533,7 +676,8 @@ void statistics_over_tau_to_csv(
     const bool use_beeren_method,
     const bool compute_statistics,
     const bool write_output,
-    const std::string& csv_output_path)
+    const std::string& csv_output_path,
+    const std::size_t wrapping_time_repetitions)
 {
     if (tau_values.empty()) {
         throw std::invalid_argument("tau_values is empty");
@@ -551,7 +695,8 @@ void statistics_over_tau_to_csv(
             validate,
             use_beeren_method,
             compute_statistics,
-            write_output);
+            write_output,
+            wrapping_time_repetitions);
         append_statistics_csv_row(csv, result);
         std::cout << "Ran stats for tau = " << tau << std::endl;
     }

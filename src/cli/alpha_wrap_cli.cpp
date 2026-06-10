@@ -78,7 +78,7 @@ bool parse_arguments(const int argc, char** argv, Arguments& args)
       args.validate = true;
     else if(flag == "--wrap_invalid_only")
       args.wrap_invalid_only = true;
-    else if(flag == "--use_noprmal_alpha_wrap" || flag == "--use_normal_alpha_wrap")
+    else if(flag == "--use_normal_alpha_wrap" || flag == "--use_normal_alpha_wrap")
       args.use_noprmal_alpha_wrap = true;
     else
       return false;

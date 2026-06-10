@@ -59,6 +59,17 @@ bool run_val3dity_test(const std::string& input_path);
 std::size_t output_mesh_vertex_count(const Mesh& mesh);
 std::size_t output_mesh_face_count(const Mesh& mesh);
 
+Mesh exploder(
+    const std::string& input_off_path,
+    double mean_shift_distance,
+    double stddev_shift_distance);
+
+bool exploder_to_off(
+    const std::string& input_off_path,
+    const std::string& output_off_path,
+    double mean_shift_distance,
+    double stddev_shift_distance);
+
 Statistics_result statisctics(
     double relative_alpha,
     double relative_offset,
@@ -67,7 +78,8 @@ Statistics_result statisctics(
     bool validate,
     bool use_beeren_method,
     bool statistics,
-    bool write_output);
+    bool write_output,
+    std::size_t wrapping_time_repetitions = 10);
 
 Statistics_result statistics(
     double relative_alpha,
@@ -77,7 +89,8 @@ Statistics_result statistics(
     bool validate,
     bool use_beeren_method,
     bool compute_statistics,
-    bool write_output);
+    bool write_output,
+    std::size_t wrapping_time_repetitions = 10);
 
 void statistics_over_relative_alpha_to_csv(
     const std::vector<double>& relative_alpha_values,
@@ -88,7 +101,8 @@ void statistics_over_relative_alpha_to_csv(
     bool use_beeren_method,
     bool compute_statistics,
     bool write_output,
-    const std::string& csv_output_path);
+    const std::string& csv_output_path,
+    std::size_t wrapping_time_repetitions = 10);
 
 void statistics_over_relative_offset_to_csv(
     double relative_alpha,
@@ -99,7 +113,8 @@ void statistics_over_relative_offset_to_csv(
     bool use_beeren_method,
     bool compute_statistics,
     bool write_output,
-    const std::string& csv_output_path);
+    const std::string& csv_output_path,
+    std::size_t wrapping_time_repetitions = 10);
 
 void statistics_over_tau_to_csv(
     double relative_alpha,
@@ -110,7 +125,8 @@ void statistics_over_tau_to_csv(
     bool use_beeren_method,
     bool compute_statistics,
     bool write_output,
-    const std::string& csv_output_path);
+    const std::string& csv_output_path,
+    std::size_t wrapping_time_repetitions = 10);
 
 template <typename Callable>
 double runtime_seconds(Callable&& callable)

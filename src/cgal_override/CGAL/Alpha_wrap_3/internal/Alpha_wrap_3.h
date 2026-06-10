@@ -1635,13 +1635,13 @@ public:
       return Facet_status::TRAVERSABLE;
     }
 
-    if (is_empty_cell(nh)) {
-      // Keep the CGAL invariant: outside-cell circumcenters must stay outside the offset.
-      // If we carve an empty cell whose circumcenter is in the offset, later Steiner
-      // computations can hit assertion failures.
-      if(!is_cell_circumcenter_in_offset(nh))
-        return Facet_status::IS_ZOMBIE_CELL;
-    }
+    // if (is_empty_cell(nh)) {
+    //   // Keep the CGAL invariant: outside-cell circumcenters must stay outside the offset.
+    //   // If we carve an empty cell whose circumcenter is in the offset, later Steiner
+    //   // computations can hit assertion failures.
+    //   if(!is_cell_circumcenter_in_offset(nh))
+    //     return Facet_status::IS_ZOMBIE_CELL;
+    // }
 
         // std::cout << "👼🏼👼🏼👼🏼face is NOT traversable, and neighbor cell contains input!👼🏼👼🏼👼🏼" << std::endl;
 

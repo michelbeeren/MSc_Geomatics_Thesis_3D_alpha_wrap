@@ -487,6 +487,8 @@ Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_al
     const double diag_length = std::sqrt(CGAL::square(bbox.xmax() - bbox.xmin()) +
                                          CGAL::square(bbox.ymax() - bbox.ymin()) +
                                          CGAL::square(bbox.zmax() - bbox.zmin()));
+    // const double alpha = 10;
+    // const double offset = 0.03;
     const double alpha = diag_length / relative_alpha_;
     const double offset = diag_length / relative_offset_;
     std::cout << "--------------------3D ALPHA WRAPPING THE INPUT:----------------" << std::endl;

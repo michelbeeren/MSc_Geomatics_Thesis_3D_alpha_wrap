@@ -14,6 +14,7 @@
 #include <CGAL/IO/Color.h>
 #include <fstream>
 #include <vector>
+#include <memory>
 
 // ========================= NAMESPACES/USING =============================
 namespace PMP = CGAL::Polygon_mesh_processing;
@@ -48,16 +49,19 @@ int main(int argc, char** argv)
   std::cout << "Reading input: " << filename << std::endl;
 
   const double relative_alpha = 20; //2000. //20. //1000.
-  const double relative_offset = 5000.; // 7000. //600. //12000.
+  const double relative_offset = 6000.; // 7000. //600. //12000.
+
+  // exploder_to_off("../data/Input/3DBAG_Buildings/aula.off","../data/Input/exploded/aula_1.off",1,0.0);
 
   bool beeren_method = true;
   const double max_d_to_input_in_offsets_ = 2;
   bool write_output_ = true;
-  bool validate_ = true;
+  bool validate_ = false;
   const bool run_statistics_sweeps = false; // set true to generate sweep CSV files
 
   Mesh input_mesh_for_statistics;
   bool has_input_mesh_for_statistics = false;
+  std::unique_ptr<MeshData> triangle_data;
 
   const Input_kind kind = detect_input_kind(filename);
 
@@ -81,7 +85,8 @@ int main(int argc, char** argv)
     else if (!beeren_method) {
       std::cout << "🏃🏼‍♀️‍➡️🏃🏽‍♀️‍➡️🏃🏾‍♀️‍➡️🏃🏿‍♀️‍➡️Running normal algorithm" << std::endl;
     }
-    auto data = mesh_input(filename, true, true); // set both to false if you do not want to compute normals + tree
+    triangle_data = std::make_unique<MeshData>(mesh_input(filename, true, true)); // set both to false if you do not want to compute normals + tree
+    MeshData& data = *triangle_data;
     Mesh& mesh = data.mesh;
     input_mesh_for_statistics = mesh;
     has_input_mesh_for_statistics = true;
@@ -89,12 +94,20 @@ int main(int argc, char** argv)
     std::cout << "face_normals.size = " << face_normals.size() << std::endl;
     Tree& tree = *data.tree;
     valid_mesh_boolean(mesh); // is input mesh valid
-    Mesh alpha_wrap = _3D_alpha_wrap_tr_mesh(filename,relative_alpha,relative_offset,data, beeren_method, max_d_to_input_in_offsets_, write_output_, validate_);
+    Mesh alpha_wrap = _3D_alpha_wrap_tr_mesh(filename, relative_alpha, relative_offset, data,
+                                             beeren_method, max_d_to_input_in_offsets_,
+                                             write_output_, validate_);
   }
   else
   {
     throw std::runtime_error("Input is neither a valid triangle mesh nor a valid point cloud: " + filename);
   }
+
+  // if (triangle_data) {
+  //   Mesh alpha_wrap_octree = _3D_alpha_wrap(filename, relative_alpha, relative_offset, *triangle_data,
+  //                                           beeren_method, max_d_to_input_in_offsets_,
+  //                                           false, true, write_output_, validate_, false);
+  // }
 
   if (run_statistics_sweeps) {
     if (!has_input_mesh_for_statistics) {
@@ -102,10 +115,10 @@ int main(int argc, char** argv)
     }
 
     // statistics_over_relative_alpha_to_csv(
-    //     {20.0, 25., 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100,110, 120,130, 140, 150, 160, 180, 200, 220, 240, 260},
+    //     {20.0, 30, 40, 50, 60, 70, 80, 90, 100},
     //     relative_offset, max_d_to_input_in_offsets_, input_mesh_for_statistics,
     //     false, false, true, false,
-    //     "../data/Output/statistics/sweep_alpha_o5000_n100.csv");
+    //     "../data/Output/statistics/sweep_alpha_o1000_n10_20.csv",10);
 
     // statistics_over_relative_offset_to_csv(
     //     relative_alpha,
@@ -116,15 +129,11 @@ int main(int argc, char** argv)
 
     // statistics_over_tau_to_csv(
     //     relative_alpha, relative_offset,
-    //     {1.1, 1.11, 1.12, 1.13, 1.15, 1.17, 1.2, 1.25, 1.3, 1.4, 1.5, 1.7, 2.0, 2.5, 3.0, 3.5, 4.5, 4, 5, 5.5, 6, 7, 7.5, 8, 8.5, 9, 9.5, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 30, 35, 40, 50, 60, 70, 80, 100, 150, 200},
+    //     {1.1, 1.12, 1.15, 1.2, 1.25, 1.3, 1.5, 1.7, 2.0, 2.5, 3.0, 4, 5, 6, 7.5, 8.5, 10, 12, 15, 20, 25, 30},
     //     input_mesh_for_statistics,
     //     false, true, true, false,
-    //     "../data/Output/statistics/sweep_tau_o5000.csv");
+    //     "../data/Output/statistics/sweep_tau_o1000_n10_40.csv", 5);
   }
-
-    // ------------------------------ALPHA WRAP INPUT---------------------------------------
-    // Mesh alpha_wrap = _3D_alpha_wrap(filename,relative_alpha,relative_offset, data, true, false, false, true, true, false); // set both to false if you do not want to write out the file and test if valid
-
 
     // ---------------------------------STATISTICS---------------------------------------
     // std::vector<Point_3> samples = _surface_sampling(mesh, 200.0);
