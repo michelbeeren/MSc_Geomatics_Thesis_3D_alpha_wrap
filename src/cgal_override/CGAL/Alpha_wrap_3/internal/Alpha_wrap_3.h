@@ -1553,6 +1553,30 @@ private:
     return m_oracle.do_intersect(ch_cc_offset_ball);
   }
 
+  bool would_expose_non_traversable_facet(const Cell_handle ch,
+                                          const int s,
+                                          const Cell_handle nh) const
+  {
+    CGAL_precondition(ch->is_outside());
+    CGAL_precondition(!m_tr.is_infinite(nh));
+
+    const int mi = m_tr.mirror_index(ch, s);
+    for(int i=1; i<4; ++i)
+    {
+      const int exposed_facet_index = (mi + i) & 3;
+      const Cell_handle exposed_neighbor = nh->neighbor(exposed_facet_index);
+
+      if(m_tr.is_infinite(exposed_neighbor) || exposed_neighbor->is_outside())
+        continue;
+
+      const Facet exposed_facet = std::make_pair(nh, exposed_facet_index);
+      if(!is_traversable(exposed_facet))
+        return true;
+    }
+
+    return false;
+  }
+
   void carve_through_gate(const Cell_handle ch,
                         const int s,
                         const Cell_handle nh)
@@ -1635,13 +1659,8 @@ public:
       return Facet_status::TRAVERSABLE;
     }
 
-    // if (is_empty_cell(nh)) {
-    //   // Keep the CGAL invariant: outside-cell circumcenters must stay outside the offset.
-    //   // If we carve an empty cell whose circumcenter is in the offset, later Steiner
-    //   // computations can hit assertion failures.
-    //   if(!is_cell_circumcenter_in_offset(nh))
-    //     return Facet_status::IS_ZOMBIE_CELL;
-    // }
+    if(is_empty_cell(nh) && would_expose_non_traversable_facet(ch, id, nh))
+      return Facet_status::IS_ZOMBIE_CELL;
 
         // std::cout << "👼🏼👼🏼👼🏼face is NOT traversable, and neighbor cell contains input!👼🏼👼🏼👼🏼" << std::endl;
 
