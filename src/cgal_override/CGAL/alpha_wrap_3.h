@@ -33,11 +33,11 @@ namespace CGAL {
     namespace internal_np {
         struct mat_path_t {};
         struct octree_t {};
-        struct max_distance_to_input_in_offsets_t {};
+        struct max_distance_to_input_t {};
         // Tag object, same style as internal_np::geom_traits, etc.
         static const mat_path_t mat_path = mat_path_t();
         static const octree_t octree = octree_t();
-        static const max_distance_to_input_in_offsets_t max_distance_to_input_in_offsets = max_distance_to_input_in_offsets_t();
+        static const max_distance_to_input_t max_distance_to_input = max_distance_to_input_t();
     }
 
     namespace parameters {
@@ -55,11 +55,11 @@ namespace CGAL {
         }
 
         inline CGAL::Named_function_parameters<double,
-                                               internal_np::max_distance_to_input_in_offsets_t>
-        max_distance_to_input_in_offsets(const double d)
+                                               internal_np::max_distance_to_input_t>
+        max_distance_to_input(const double d)
         {
             return CGAL::Named_function_parameters<double,
-                                                   internal_np::max_distance_to_input_in_offsets_t>(d);
+                                                   internal_np::max_distance_to_input_t>(d);
         }
     }
 
@@ -157,33 +157,33 @@ void alpha_wrap_3(const PointRange& points,
         alpha_wrap_builder.set_octree(cells);  // Use Octree if cells are provided
     }
 
-    constexpr double default_max_distance_to_input_in_offsets = 1.5; // default max_distance_to_input_in_offsets
+    const double default_max_distance_to_input = 2. * offset; // default max_distance_to_input
         const bool max_dist_param_used =
           !is_default_parameter<InputNamedParameters,
-                                internal_np::max_distance_to_input_in_offsets_t>::value;
+                                internal_np::max_distance_to_input_t>::value;
 
-        double max_dist_factor = default_max_distance_to_input_in_offsets;
+        double max_dist_factor = default_max_distance_to_input;
 
         if(max_dist_param_used)
         {
             max_dist_factor =
               choose_parameter(
-                get_parameter(in_np, internal_np::max_distance_to_input_in_offsets),
-                default_max_distance_to_input_in_offsets
+                get_parameter(in_np, internal_np::max_distance_to_input),
+                default_max_distance_to_input
               );
 
-            if(max_dist_factor <= 1.0)
+            if(max_dist_factor <= offset)
             {
                 std::cerr
                   << "[CGAL::alpha_wrap_3] Named parameter "
-                  << "`max_distance_to_input_in_offsets` = " << max_dist_factor
-                  << " is invalid (must be > 1.0). "
-                  << "Using default value 1.5.\n";
+                  << "`max_distance_to_input` = " << max_dist_factor
+                  << " is invalid (must be > offset = " << offset << "). "
+                  << "Using default value " << default_max_distance_to_input << ".\n";
 
-                max_dist_factor = default_max_distance_to_input_in_offsets;
+                max_dist_factor = default_max_distance_to_input;
             }
 
-            alpha_wrap_builder.set_max_distance_to_input_in_offsets(max_dist_factor);
+            alpha_wrap_builder.set_max_distance_to_input(max_dist_factor);
         }
 
         alpha_wrap_builder.set_check_face_distance_from_input(max_dist_param_used);
@@ -348,33 +348,33 @@ void alpha_wrap_3(const TriangleMesh& tmesh,
         alpha_wrap_builder.set_octree(cells);  // Use Octree if cells are provided
     }
 
-    constexpr double default_max_distance_to_input_in_offsets = 1.5; // default max_distance_to_input_in_offsets
+    const double default_max_distance_to_input = 2. * offset; // default max_distance_to_input
         const bool max_dist_param_used =
           !is_default_parameter<InputNamedParameters,
-                                internal_np::max_distance_to_input_in_offsets_t>::value;
+                                internal_np::max_distance_to_input_t>::value;
 
-        double max_dist_factor = default_max_distance_to_input_in_offsets;
+        double max_dist_factor = default_max_distance_to_input;
 
         if(max_dist_param_used)
         {
             max_dist_factor =
               choose_parameter(
-                get_parameter(in_np, internal_np::max_distance_to_input_in_offsets),
-                default_max_distance_to_input_in_offsets
+                get_parameter(in_np, internal_np::max_distance_to_input),
+                default_max_distance_to_input
               );
 
-            if(max_dist_factor <= 1.0)
+            if(max_dist_factor <= offset)
             {
                 std::cerr
                   << "[CGAL::alpha_wrap_3] Named parameter "
-                  << "`max_distance_to_input_in_offsets` = " << max_dist_factor
-                  << " is invalid (must be > 1.0). "
-                  << "Using default value 1.5.\n";
+                  << "`max_distance_to_input` = " << max_dist_factor
+                  << " is invalid (must be > offset). "
+                  << "Using default value " << default_max_distance_to_input << ".\n";
 
-                max_dist_factor = default_max_distance_to_input_in_offsets;
+                max_dist_factor = default_max_distance_to_input;
             }
 
-            alpha_wrap_builder.set_max_distance_to_input_in_offsets(max_dist_factor);
+            alpha_wrap_builder.set_max_distance_to_input(max_dist_factor);
         }
 
         alpha_wrap_builder.set_check_face_distance_from_input(max_dist_param_used);
@@ -487,33 +487,33 @@ void alpha_wrap_3(const PointRange& points,
         alpha_wrap_builder.set_octree(cells);  // Use Octree if cells are provided
     }
 
-    constexpr double default_max_distance_to_input_in_offsets = 1.5; // default max_distance_to_input_in_offsets
+    const double default_max_distance_to_input = 2. * offset; // default max_distance_to_input
         const bool max_dist_param_used =
           !is_default_parameter<InputNamedParameters,
-                                internal_np::max_distance_to_input_in_offsets_t>::value;
+                                internal_np::max_distance_to_input_t>::value;
 
-        double max_dist_factor = default_max_distance_to_input_in_offsets;
+        double max_dist_factor = default_max_distance_to_input;
 
         if(max_dist_param_used)
         {
             max_dist_factor =
               choose_parameter(
-                get_parameter(in_np, internal_np::max_distance_to_input_in_offsets),
-                default_max_distance_to_input_in_offsets
+                get_parameter(in_np, internal_np::max_distance_to_input),
+                default_max_distance_to_input
               );
 
-            if(max_dist_factor <= 1.0)
+            if(max_dist_factor <= offset)
             {
                 std::cerr
                   << "[CGAL::alpha_wrap_3] Named parameter "
-                  << "`max_distance_to_input_in_offsets` = " << max_dist_factor
-                  << " is invalid (must be > 1.0). "
-                  << "Using default value 1.5.\n";
+                  << "`max_distance_to_input` = " << max_dist_factor
+                  << " is invalid (must be > offset = " << offset << "). "
+                  << "Using default value " << default_max_distance_to_input << ".\n";
 
-                max_dist_factor = default_max_distance_to_input_in_offsets;
+                max_dist_factor = default_max_distance_to_input;
             }
 
-            alpha_wrap_builder.set_max_distance_to_input_in_offsets(max_dist_factor);
+            alpha_wrap_builder.set_max_distance_to_input(max_dist_factor);
         }
 
         alpha_wrap_builder.set_check_face_distance_from_input(max_dist_param_used);

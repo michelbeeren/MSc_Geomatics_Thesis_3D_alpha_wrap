@@ -44,7 +44,7 @@ void print_usage(const char* executable)
             << "[--validate] [--wrap_invalid_only] [--use_noprmal_alpha_wrap]\n\n"
             << "Notes:\n"
             << "  - alpha and offset are absolute values\n"
-            << "  - tau is max_distance_to_input_in_offsets and must be > 1.0\n"
+            << "  - tau is max_distance_to_input and must be > offset\n"
             << "  - add --validate to run mesh validation\n"
             << "  - add --wrap_invalid_only to validate each connected component, wrap invalid ones,\n"
             << "    and wrap intersecting disconnected component groups together\n"
@@ -560,8 +560,8 @@ int main(int argc, char** argv)
       throw std::runtime_error("alpha must be a positive finite value.");
     if(!cli_helpers::is_positive_finite(args.offset))
       throw std::runtime_error("offset must be a positive finite value.");
-    if(!(std::isfinite(args.tau) && args.tau > 1.0))
-      throw std::runtime_error("tau must be finite and strictly larger than 1.0.");
+    if(!(std::isfinite(args.tau) && args.tau > args.offset))
+      throw std::runtime_error("tau must be finite and strictly larger than offset.");
     if((args.validate || args.wrap_invalid_only) && !cli_helpers::val3dity_available())
       throw std::runtime_error(
           "val3dity is required when using --validate or --wrap_invalid_only. "

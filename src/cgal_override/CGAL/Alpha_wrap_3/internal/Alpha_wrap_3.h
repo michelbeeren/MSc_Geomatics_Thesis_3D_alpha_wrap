@@ -193,8 +193,8 @@ protected:
   std::vector<CGAL::Bbox_3> m_cells;  // New member to store the octree path
   mutable std::unique_ptr<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>> m_octree_ptr;
 
-  // Default parameter: factor relative to offset
-  double m_max_distance_to_input_in_offsets = 1.5;
+  // Default parameter: absolute maximum distance to input
+  double m_max_distance_to_input = -1.;
   bool m_check_face_distance_from_input = false;
 
   FT m_alpha = FT(-1), m_sq_alpha = FT(-1);
@@ -297,9 +297,9 @@ public:
     }
   }
 
-  void set_max_distance_to_input_in_offsets(const double factor)
+  void set_max_distance_to_input(const double distance)
   {
-    m_max_distance_to_input_in_offsets = factor;
+    m_max_distance_to_input = distance;
   }
 
   void set_check_face_distance_from_input(const bool b)
@@ -1076,7 +1076,7 @@ bool too_far_from_input(const Facet& f) const {
   const double dist_input = std::sqrt(CGAL::to_double(sq_d));
 
   // max distance a triangle midpoint may be from the input
-  const double tolerance = m_max_distance_to_input_in_offsets * m_offset; // ToDo should be parameter, also with safe threshold of e.g. 1.1
+  const double tolerance = m_max_distance_to_input;
 
   if (dist_input > tolerance) {
      // if distance of triangle midpoint to input is larger than threshold, return that face is traversable
@@ -1117,7 +1117,7 @@ bool too_far_from_input(const Facet& f) const {
   // function to check if a face is traversible
 bool is_traversable(const Facet& f) const
 {
-  bool check_face_distance_from_input = m_check_face_distance_from_input; // check face distance from input if max_distance_to_input_in_offsets is provided
+  bool check_face_distance_from_input = m_check_face_distance_from_input; // check face distance from input if max_distance_to_input is provided
   // A) Default CGAL behavior: when neither MAT nor Octree is used
   if ((!m_use_mat || !m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr))
   {
@@ -1495,7 +1495,7 @@ bool is_traversable(const Facet& f) const
                              Point_3& steiner_point) const
   {
     // return compute_steiner_point_normal(ch, neighbor, steiner_point);
-    const bool mod_steiner_computation = m_check_face_distance_from_input; // only use modified steiner point placement if parameter max_distance_to_input_in_offsets is used
+    const bool mod_steiner_computation = m_check_face_distance_from_input; // only use modified steiner point placement if parameter max_distance_to_input is used
 
   // use normal steiner computation
     if (!mod_steiner_computation) {
@@ -1757,7 +1757,9 @@ private:
     m_sq_alpha = square(m_alpha);
     m_offset = FT(offset);
     m_sq_offset = square(m_offset);
-    m_lower_bound_tau = (m_max_distance_to_input_in_offsets-1)*m_offset;
+    if(!m_check_face_distance_from_input)
+      m_max_distance_to_input = 2. * offset;
+    m_lower_bound_tau = m_max_distance_to_input-m_offset;
     m_min_points_d = (std::min)((std::min)(m_alpha, m_offset), m_lower_bound_tau);
 
     const Bbox_3 ib = m_oracle.bbox();

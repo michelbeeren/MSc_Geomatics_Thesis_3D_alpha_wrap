@@ -185,7 +185,7 @@ double compute_upper_bound(
         return alpha + offset;
     }
 
-    const double g = (tau - 1.0) * offset;
+    const double g = tau - offset;
     const double c1 = (4.0 / 15.0) * alpha;
     const double c2 = (2.0 / 3.0) * alpha;
 
@@ -489,10 +489,6 @@ Statistics_result statisctics(
     if (wrapping_time_repetitions == 0) {
         throw std::invalid_argument("wrapping_time_repetitions must be >= 1");
     }
-    if (use_beeren_method && (!std::isfinite(tau) || tau <= 1.0)) {
-        throw std::invalid_argument("tau must be finite and > 1.0 when use_beeren_method=true");
-    }
-
     ensure_triangle_mesh_in_place(input, "input");
 
     Statistics_result result;
@@ -503,7 +499,10 @@ Statistics_result statisctics(
     const double diagonal = bbox_diagonal(input);
     result.alpha = diagonal / relative_alpha;
     result.offset = diagonal / relative_offset;
-    result.absolute_tau = tau * result.offset;
+    if (use_beeren_method && (!std::isfinite(tau) || tau <= result.offset)) {
+        throw std::invalid_argument("tau must be finite and > offset when use_beeren_method=true");
+    }
+    result.absolute_tau = tau;
     result.upper_bound = compute_upper_bound(result.alpha, result.offset, tau, use_beeren_method);
 
     Mesh wrap;
@@ -520,7 +519,7 @@ Statistics_result statisctics(
                 result.alpha,
                 result.offset,
                 current_wrap,
-                CGAL::parameters::max_distance_to_input_in_offsets(tau));
+                CGAL::parameters::max_distance_to_input(tau));
         } else {
             CGAL::alpha_wrap_3(input, result.alpha, result.offset, current_wrap);
         }

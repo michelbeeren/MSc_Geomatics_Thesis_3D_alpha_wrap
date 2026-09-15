@@ -54,9 +54,9 @@ int main(int argc, char** argv)
   // exploder_to_off("../data/Input/3DBAG_Buildings/aula.off","../data/Input/exploded/aula_1.off",1,0.0);
 
   bool beeren_method = true;
-  const double max_d_to_input_in_offsets_ = 2;
+  const double max_distance_to_input = 0.02;
   bool write_output_ = true;
-  bool validate_ = false;
+  bool validate_ = true;
   const bool run_statistics_sweeps = false; // set true to generate sweep CSV files
 
   Mesh input_mesh_for_statistics;
@@ -69,18 +69,18 @@ int main(int argc, char** argv)
     std::cout << "⚽️🏀⚾️🥎🎾🏐🎱 input type = Point Cloud ⚽️🏀⚾️🥎🎾🏐🎱" << std::endl;
     if (beeren_method) {
       std::cout << "🐻🐻🐻 BEEREN METHOD 🐻🐻🐻" << std::endl;
-      std::cout << "Ⓜ️🅰️❎ 📐distance📐 to input in offsets = " << max_d_to_input_in_offsets_ << std::endl;
+      std::cout << "max distance to input = " << max_distance_to_input << std::endl;
     }
     else if (!beeren_method) {
       std::cout << "🏃🏼‍♀️‍➡️🏃🏽‍♀️‍➡️🏃🏾‍♀️‍➡️🏃🏿‍♀️‍➡️Running normal algorithm" << std::endl;
     }
-    Mesh alpha_wrap_pc = _3D_alpha_wrap_pc(filename,relative_alpha,relative_offset,beeren_method,max_d_to_input_in_offsets_,write_output_,validate_);
+    Mesh alpha_wrap_pc = _3D_alpha_wrap_pc(filename,relative_alpha,relative_offset,beeren_method,max_distance_to_input,write_output_,validate_);
   }
   else if (kind == Input_kind::Triangle_mesh) {
     std::cout << "🔺⚠️🔼▲ input type = triangle mesh ▲🔼⚠️🔺" << std::endl;
     if (beeren_method) {
       std::cout << "🐻🐻🐻 BEEREN METHOD 🐻🐻🐻" << std::endl;
-      std::cout << "Ⓜ️🅰️❎ 📐distance📐 to input in offsets = " << max_d_to_input_in_offsets_ << std::endl;
+      std::cout << "max distance to input = " << max_distance_to_input << std::endl;
     }
     else if (!beeren_method) {
       std::cout << "🏃🏼‍♀️‍➡️🏃🏽‍♀️‍➡️🏃🏾‍♀️‍➡️🏃🏿‍♀️‍➡️Running normal algorithm" << std::endl;
@@ -95,7 +95,7 @@ int main(int argc, char** argv)
     Tree& tree = *data.tree;
     valid_mesh_boolean(mesh); // is input mesh valid
     Mesh alpha_wrap = _3D_alpha_wrap_tr_mesh(filename, relative_alpha, relative_offset, data,
-                                             beeren_method, max_d_to_input_in_offsets_,
+                                             beeren_method, max_distance_to_input,
                                              write_output_, validate_);
   }
   else
@@ -105,7 +105,7 @@ int main(int argc, char** argv)
 
   // if (triangle_data) {
   //   Mesh alpha_wrap_octree = _3D_alpha_wrap(filename, relative_alpha, relative_offset, *triangle_data,
-  //                                           beeren_method, max_d_to_input_in_offsets_,
+  //                                           beeren_method, max_distance_to_input,
   //                                           false, true, write_output_, validate_, false);
   // }
 
@@ -116,14 +116,14 @@ int main(int argc, char** argv)
 
     // statistics_over_relative_alpha_to_csv(
     //     {20.0, 30, 40, 50, 60, 70, 80, 90, 100},
-    //     relative_offset, max_d_to_input_in_offsets_, input_mesh_for_statistics,
+    //     relative_offset, max_distance_to_input, input_mesh_for_statistics,
     //     false, false, true, false,
     //     "../data/Output/statistics/sweep_alpha_o1000_n10_20.csv",10);
 
     // statistics_over_relative_offset_to_csv(
     //     relative_alpha,
     //     {500.0, 1000.0, 2000.0},
-    //     max_d_to_input_in_offsets_, input_mesh_for_statistics,
+    //     max_distance_to_input, input_mesh_for_statistics,
     //     true, true, true, false,
     //     "../data/Output/statistics/sweep_offset.csv");
 

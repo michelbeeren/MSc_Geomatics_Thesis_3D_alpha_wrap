@@ -297,10 +297,10 @@ std::string generate_output_name(const std::string input_name_, const double rel
 
 
 // 3D alpha wrap
-Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool max_d_in_offets, const double max_d, bool MAT, bool Octree, bool write_out_, bool validate, bool hausdorff) {
+Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool use_max_distance_to_input, const double max_d, bool MAT, bool Octree, bool write_out_, bool validate, bool hausdorff) {
     // get mesh from input data
     Mesh& mesh_ = data_.mesh;
-    double max_d_to_input_in_offsets_ = max_d;
+    double max_distance_to_input = max_d;
 
     // compute alpha and offset from a_rel and d_rel and bbox
     CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh_);
@@ -397,11 +397,11 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
     if ((!Octree && !MAT) || (Octree && MAT)) {
         // Default: call alpha_wrap_3 without MAT or Octree
 
-        if (max_d_in_offets) {
+        if (use_max_distance_to_input) {
             std::cout << "..........Running alpha wrap algorithm with other refinement rule and steiner point placement.........." << std::endl;
-            CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::max_distance_to_input_in_offsets(max_d_to_input_in_offsets_));
+            CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::max_distance_to_input(max_distance_to_input));
         }
-        if (!max_d_in_offets) {
+        if (!use_max_distance_to_input) {
             std::cout << "..........Running normal alpha wrap algorithm.........." << std::endl;
             CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap);
         }
@@ -428,15 +428,15 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
             }
             output_ += "_Octree.off";
         }
-        if (max_d_in_offets) {
+        if (use_max_distance_to_input) {
             if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
                 output_ = output_.substr(0, output_.size() - 4);
             }
             std::ostringstream oss;
-            if (max_d_to_input_in_offsets_ <= 1) {
-                max_d_to_input_in_offsets_ = 1.5;
+            if (max_distance_to_input <= offset) {
+                max_distance_to_input = 2 * offset;
             }
-            oss << std::fixed << std::setprecision(1) << max_d_to_input_in_offsets_;
+            oss << std::fixed << std::setprecision(1) << max_distance_to_input;
             const std::string refined = oss.str();
             output_ += "_refined=" + refined + ".off";
         }
@@ -462,7 +462,7 @@ Mesh _3D_alpha_wrap(const std::string filename, const double relative_alpha_, co
 
 double upper_bound_max_d_to_input(const double alpha, const double offset, Mesh& input, Mesh& output, double tau) {
     double upper_bound_max_d_to_input = 0.0;
-    double t = (tau-1)*offset;
+    double t = tau - offset;
     if (t >= 0. && t <= (4./15.)*alpha) {
         upper_bound_max_d_to_input = offset + (2./3.)*alpha + t/2.;
     }
@@ -478,9 +478,9 @@ double upper_bound_max_d_to_input(const double alpha, const double offset, Mesh&
     return upper_bound_max_d_to_input;
 }
 
-Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool max_d_in_offets, const double max_d, bool write_out_, bool validate) {
+Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_alpha_, const double relative_offset_, MeshData& data_, bool use_max_distance_to_input, const double max_d, bool write_out_, bool validate) {
     Mesh& mesh_ = data_.mesh;
-    double max_d_to_input_in_offsets_ = max_d;
+    double max_distance_to_input = max_d;
 
     // compute alpha and offset from a_rel and d_rel and bbox
     CGAL::Bbox_3 bbox = CGAL::Polygon_mesh_processing::bbox(mesh_);
@@ -499,11 +499,11 @@ Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_al
     t.start();
 
     Mesh wrap;
-    if (max_d_in_offets) {
+    if (use_max_distance_to_input) {
         std::cout << "..........Running alpha wrap algorithm with other refinement rule and steiner point placement.........." << std::endl;
-        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::max_distance_to_input_in_offsets(max_d_to_input_in_offsets_));
+        CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap, CGAL::parameters::max_distance_to_input(max_distance_to_input));
     }
-    if (!max_d_in_offets) {
+    if (!use_max_distance_to_input) {
         std::cout << "..........Running normal alpha wrap algorithm.........." << std::endl;
         CGAL::alpha_wrap_3(mesh_, alpha, offset, wrap);
     }
@@ -516,30 +516,30 @@ Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_al
     if (write_out_) {
         std::filesystem::path p(output_);
         std::filesystem::create_directories(p.parent_path());
-        if (max_d_in_offets) {
+        if (use_max_distance_to_input) {
             if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
                 output_ = output_.substr(0, output_.size() - 4);
             }
             std::ostringstream oss;
-            if (max_d_to_input_in_offsets_ <= 1) {
-                max_d_to_input_in_offsets_ = 1.5;
+            if (max_distance_to_input <= offset) {
+                max_distance_to_input = 2 * offset;
             }
-            oss << std::fixed << std::setprecision(1) << max_d_to_input_in_offsets_;
+            oss << std::fixed << std::setprecision(1) << max_distance_to_input;
             const std::string refined = oss.str();
             output_ += "_refined=" + refined + ".off";
-            upper_bound = upper_bound_max_d_to_input(alpha, offset, mesh_, wrap, max_d_to_input_in_offsets_);
+            upper_bound = upper_bound_max_d_to_input(alpha, offset, mesh_, wrap, max_distance_to_input);
             std::cout << "upper_bound = " << upper_bound << std::endl;
-            double g = max_d_to_input_in_offsets_*offset;
+            double g = max_distance_to_input - offset;
             std::cout << "g = " << g << std::endl;
         }
-        if (!max_d_in_offets) {
-            upper_bound_max_d_to_input(alpha, offset, mesh_, wrap, max_d_in_offets);
+        if (!use_max_distance_to_input) {
+            upper_bound_max_d_to_input(alpha, offset, mesh_, wrap, use_max_distance_to_input);
             std::cout << "upper_bound = " << upper_bound << std::endl;
         }
         std::cout << "📝 Writing 📝 to: " << output_ << std::endl;
         CGAL::IO::write_polygon_mesh(output_, wrap, CGAL::parameters::stream_precision(25));
         double dmin = smallest_point_to_point_distance_from_off(output_);
-        double lower_bound_tr_sphere = (max_d_to_input_in_offsets_-1)*offset;
+        double lower_bound_tr_sphere = max_distance_to_input - offset;
         // std::cout << "alpha = " << alpha << " , offset = " << offset << " , Beeren method lowest = " << lower_bound_tr_sphere << std::endl;
         double lower_bound = std::min({lower_bound_tr_sphere, offset, alpha});
         // std::cout << "prooven lower bound = " << lower_bound << std::endl;
@@ -554,8 +554,8 @@ Mesh _3D_alpha_wrap_tr_mesh(const std::string filename, const double relative_al
     return wrap;
 }
 
-Mesh _3D_alpha_wrap_pc(const std::string filename, const double relative_alpha_, const double relative_offset_, bool max_d_in_offets, const double max_d, bool write_out_, bool validate) {
-    double max_d_to_input_in_offsets_ = max_d;
+Mesh _3D_alpha_wrap_pc(const std::string filename, const double relative_alpha_, const double relative_offset_, bool use_max_distance_to_input, const double max_d, bool write_out_, bool validate) {
+    double max_distance_to_input = max_d;
 
     Point_container points_;
     if(!CGAL::IO::read_points(filename, std::back_inserter(points_)) || points_.empty())
@@ -583,11 +583,11 @@ Mesh _3D_alpha_wrap_pc(const std::string filename, const double relative_alpha_,
     t.start();
 
     Mesh wrap;
-    if (max_d_in_offets) {
+    if (use_max_distance_to_input) {
         std::cout << "..........Running alpha wrap algorithm with other refinement rule and steiner point placement.........." << std::endl;
-        CGAL::alpha_wrap_3(points_, alpha, offset, wrap, CGAL::parameters::max_distance_to_input_in_offsets(max_d_to_input_in_offsets_));
+        CGAL::alpha_wrap_3(points_, alpha, offset, wrap, CGAL::parameters::max_distance_to_input(max_distance_to_input));
     }
-    if (!max_d_in_offets) {
+    if (!use_max_distance_to_input) {
         std::cout << "..........Running normal alpha wrap algorithm.........." << std::endl;
         CGAL::alpha_wrap_3(points_, alpha, offset, wrap);
     }
@@ -599,15 +599,15 @@ Mesh _3D_alpha_wrap_pc(const std::string filename, const double relative_alpha_,
     if (write_out_) {
         std::filesystem::path p(output_);
         std::filesystem::create_directories(p.parent_path());
-        if (max_d_in_offets) {
+        if (use_max_distance_to_input) {
             if (output_.size() > 4 && output_.substr(output_.size() - 4) == ".off") {
                 output_ = output_.substr(0, output_.size() - 4);
             }
             std::ostringstream oss;
-            if (max_d_to_input_in_offsets_ <= 1) {
-                max_d_to_input_in_offsets_ = 1.5;
+            if (max_distance_to_input <= offset) {
+                max_distance_to_input = 2 * offset;
             }
-            oss << std::fixed << std::setprecision(1) << max_d_to_input_in_offsets_;
+            oss << std::fixed << std::setprecision(1) << max_distance_to_input;
             const std::string refined = oss.str();
             output_ += "_refined=" + refined + ".off";
         }

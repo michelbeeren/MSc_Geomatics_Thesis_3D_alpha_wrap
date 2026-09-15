@@ -144,7 +144,7 @@ inline Mesh wrap_triangle_mesh(const Mesh& input_mesh,
   else
   {
     CGAL::alpha_wrap_3(input_mesh, alpha, offset, wrap,
-                       CGAL::parameters::max_distance_to_input_in_offsets(tau));
+                       CGAL::parameters::max_distance_to_input(tau));
   }
   return wrap;
 }
@@ -163,7 +163,7 @@ inline Mesh wrap_point_cloud(const Point_container& points,
   else
   {
     CGAL::alpha_wrap_3(points, alpha, offset, wrap,
-                       CGAL::parameters::max_distance_to_input_in_offsets(tau));
+                       CGAL::parameters::max_distance_to_input(tau));
   }
   return wrap;
 }
@@ -176,9 +176,6 @@ inline Wrap_result run_alpha_wrap(const Wrap_request& request)
     throw std::runtime_error("alpha must be a positive finite value.");
   if(!is_positive_finite(request.relative_offset))
     throw std::runtime_error("offset must be a positive finite value.");
-  if(!(std::isfinite(request.tau) && request.tau > 1.0))
-    throw std::runtime_error("tau must be finite and strictly larger than 1.0.");
-
   const Input_kind kind = detect_input_kind(request.input_path);
   if(kind == Input_kind::Unknown)
     throw std::runtime_error("Input is neither a valid triangle mesh nor a valid point cloud: " + request.input_path);
@@ -190,6 +187,8 @@ inline Wrap_result run_alpha_wrap(const Wrap_request& request)
     if(input_was_triangulated)
       std::cout << "Input is not a triangle mesh. It will first be triangulated.\n";
     const auto [alpha, offset] = compute_absolute_alpha_offset(input_mesh, request.relative_alpha, request.relative_offset);
+    if(!(std::isfinite(request.tau) && request.tau > offset))
+      throw std::runtime_error("tau must be finite and strictly larger than offset.");
     std::cout << "Input type: triangle mesh (" << CGAL::num_faces(input_mesh) << " faces)\n";
     std::cout << "Running beeren_method with alpha=" << alpha << ", offset=" << offset << ", tau=" << request.tau << "\n";
     return Wrap_result{kind,
@@ -199,6 +198,8 @@ inline Wrap_result run_alpha_wrap(const Wrap_request& request)
 
   Point_container points = read_points_or_throw(request.input_path);
   const auto [alpha, offset] = compute_absolute_alpha_offset(points, request.relative_alpha, request.relative_offset);
+  if(!(std::isfinite(request.tau) && request.tau > offset))
+    throw std::runtime_error("tau must be finite and strictly larger than offset.");
   std::cout << "Input type: point cloud (" << points.size() << " points)\n";
   std::cout << "Running beeren_method with alpha=" << alpha << ", offset=" << offset << ", tau=" << request.tau << "\n";
   return Wrap_result{kind,
