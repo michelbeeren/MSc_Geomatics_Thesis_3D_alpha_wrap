@@ -147,15 +147,6 @@ void alpha_wrap_3(const PointRange& points,
   oracle.add_triangle_soup(points, faces, in_np);
   AW3 alpha_wrap_builder(oracle);
 
-    const std::string mat = choose_parameter(get_parameter(in_np, internal_np::mat_path), std::string());
-    if(!mat.empty()) {
-        alpha_wrap_builder.set_mat_path(mat);
-    }
-
-    const std::vector<CGAL::Bbox_3> cells = choose_parameter(get_parameter(in_np, internal_np::octree), std::vector<CGAL::Bbox_3>());
-    if (!cells.empty()) {
-        alpha_wrap_builder.set_octree(cells);  // Use Octree if cells are provided
-    }
 
     const double default_max_distance_to_input = 2. * offset; // default max_distance_to_input
         const bool max_dist_param_used =
@@ -338,15 +329,6 @@ void alpha_wrap_3(const TriangleMesh& tmesh,
   oracle.add_triangle_mesh(tmesh, in_np);
   AW3 alpha_wrap_builder(oracle);
 
-    const std::string mat = choose_parameter(get_parameter(in_np, internal_np::mat_path), std::string());
-    if(!mat.empty()) {
-        alpha_wrap_builder.set_mat_path(mat);
-    }
-
-    const std::vector<CGAL::Bbox_3> cells = choose_parameter(get_parameter(in_np, internal_np::octree), std::vector<CGAL::Bbox_3>());
-    if (!cells.empty()) {
-        alpha_wrap_builder.set_octree(cells);  // Use Octree if cells are provided
-    }
 
     const double default_max_distance_to_input = 2. * offset; // default max_distance_to_input
         const bool max_dist_param_used =
@@ -476,16 +458,6 @@ void alpha_wrap_3(const PointRange& points,
   Oracle oracle(gt);
   oracle.add_point_set(points, in_np);
   AW3 alpha_wrap_builder(oracle);
-
-    const std::string mat = choose_parameter(get_parameter(in_np, internal_np::mat_path), std::string());
-    if(!mat.empty()) {
-        alpha_wrap_builder.set_mat_path(mat);
-    }
-
-    const std::vector<CGAL::Bbox_3> cells = choose_parameter(get_parameter(in_np, internal_np::octree), std::vector<CGAL::Bbox_3>());
-    if (!cells.empty()) {
-        alpha_wrap_builder.set_octree(cells);  // Use Octree if cells are provided
-    }
 
     const double default_max_distance_to_input = 2. * offset; // default max_distance_to_input
         const bool max_dist_param_used =

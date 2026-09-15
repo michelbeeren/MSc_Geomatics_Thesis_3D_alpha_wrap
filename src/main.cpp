@@ -54,7 +54,7 @@ int main(int argc, char** argv)
   // exploder_to_off("../data/Input/3DBAG_Buildings/aula.off","../data/Input/exploded/aula_1.off",1,0.0);
 
   bool beeren_method = true;
-  const double max_distance_to_input = 0.02;
+  const double max_distance_to_input = 0.2;
   bool write_output_ = true;
   bool validate_ = true;
   const bool run_statistics_sweeps = false; // set true to generate sweep CSV files

@@ -183,15 +183,15 @@ protected:
   SC_Iso_cuboid_3 m_bbox;
   double m_xmid = 0.0, m_ymid = 0.0, m_zmid = 0.0;
 
-  // MAT support (optional)
-  bool m_use_mat = false;
-  std::string m_mat_path;
-  mutable std::unique_ptr<CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>> m_fs_mat_ptr;
-
-  // Octree support (optional)
-  bool m_use_octree = false;
-  std::vector<CGAL::Bbox_3> m_cells;  // New member to store the octree path
-  mutable std::unique_ptr<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>> m_octree_ptr;
+  // // MAT support (optional)
+  // bool m_use_mat = false;
+  // std::string m_mat_path;
+  // mutable std::unique_ptr<CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>> m_fs_mat_ptr;
+  //
+  // // Octree support (optional)
+  // bool m_use_octree = false;
+  // std::vector<CGAL::Bbox_3> m_cells;  // New member to store the octree path
+  // mutable std::unique_ptr<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>> m_octree_ptr;
 
   // Default parameter: absolute maximum distance to input
   double m_max_distance_to_input = -1.;
@@ -266,36 +266,36 @@ private:
   }
 
 public:
-  void set_mat_path(const std::string& path)
-  {
-    m_mat_path = path;
-    m_use_mat  = !m_mat_path.empty();
-
-    if(m_use_mat)
-    {
-      // always recreate (cheap enough compared to wrapping)
-      m_fs_mat_ptr = std::make_unique<
-        CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>
-      >(m_mat_path);
-    }
-    else
-    {
-      m_fs_mat_ptr.reset();
-    }
-  }
-
-  void set_octree(const std::vector<CGAL::Bbox_3>& cells)
-  {
-    m_cells = cells; // Store the Bboxes (these should be your depth-9 cubes)
-    m_use_octree = !m_cells.empty();
-
-    if (m_use_octree) {
-      // Pass the vector of Bboxes directly to your new Kd-tree based class
-      m_octree_ptr = std::make_unique<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>>(m_cells);
-    } else {
-      m_octree_ptr.reset();
-    }
-  }
+  // void set_mat_path(const std::string& path)
+  // {
+  //   m_mat_path = path;
+  //   m_use_mat  = !m_mat_path.empty();
+  //
+  //   if(m_use_mat)
+  //   {
+  //     // always recreate (cheap enough compared to wrapping)
+  //     m_fs_mat_ptr = std::make_unique<
+  //       CGAL::Alpha_wrap_3::internal::Feature_size_MAT<Geom_traits>
+  //     >(m_mat_path);
+  //   }
+  //   else
+  //   {
+  //     m_fs_mat_ptr.reset();
+  //   }
+  // }
+  //
+  // void set_octree(const std::vector<CGAL::Bbox_3>& cells)
+  // {
+  //   m_cells = cells; // Store the Bboxes (these should be your depth-9 cubes)
+  //   m_use_octree = !m_cells.empty();
+  //
+  //   if (m_use_octree) {
+  //     // Pass the vector of Bboxes directly to your new Kd-tree based class
+  //     m_octree_ptr = std::make_unique<CGAL::Alpha_wrap_3::internal::Octree_refinement_depth<Geom_traits>>(m_cells);
+  //   } else {
+  //     m_octree_ptr.reset();
+  //   }
+  // }
 
   void set_max_distance_to_input(const double distance)
   {
@@ -984,76 +984,76 @@ Point_3 mid_pt_of_triangle(Point_3 pt1, Point_3 pt2, Point_3 pt3) const {
   return triangle_mid;
 }
 
-// function to change is_traversible rules; now set local alpha's based on the approximated local feature size based on MAT
-bool use_mat(const Facet& f) const
-{
-  const Cell_handle ch = f.first; // current cell
-  const int i = f.second; // neighbor cell
-
-  // points on the triangle face that is checked for traversibility
-  const Point_3& p0 = ch->vertex((i + 1) & 3)->point();
-  const Point_3& p1 = ch->vertex((i + 2) & 3)->point();
-  const Point_3& p2 = ch->vertex((i + 3) & 3)->point();
-
-  // construct midpoint of the triangle
-  const Point_3 f_mid = mid_pt_of_triangle(p0, p1, p2);
-
-  // find nearest point in the MAT pc
-  // (pc containing randomly sampled points on input with their associated approximated feature size computed using MAT --> masbcpp implementation)
-  const double fs = m_fs_mat_ptr->nearest_feature_size(f_mid);
-  const double fs_safe = (fs > 0.0) ? fs : 1e-12;
-
-  // based on the nearest approximated featuresize, set a local alpha value; smaller alpha for smaller feature sizes
-  const double local_alpha = CGAL::to_double(m_alpha) * std::pow(fs_safe, 0.85); // alpha*3 for ref_depth=1, alpha*0.3 for ref_depth=9
-  const FT local_sq_alpha = FT(local_alpha * local_alpha);
-
-  // return bool of if the face is traversible or not based on the local alpha
-  return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);}
-
-  // function to change is_traversible rules; now set local alpha's based on proximity of sharp concave edge based on adaptive octree
-bool use_octree(const Facet& f) const{
-  const Cell_handle ch = f.first; // current cell
-  const int i = f.second; // neighboring cell
-
-  // points on the triangle face that is checked for traversibility
-  const Point_3& p0 = ch->vertex((i + 1) & 3)->point();
-  const Point_3& p1 = ch->vertex((i + 2) & 3)->point();
-  const Point_3& p2 = ch->vertex((i + 3) & 3)->point();
-
-  // construct midpoint of the triangle
-  const Point_3 f_mid = mid_pt_of_triangle(p0, p1, p2);
-
-  // adaptive octree is made, which splits a cell into 8 children if a sharp concave edge is found.
-  // the cells at max refinement depth indicate the regions where a sharp concave corner is present.
-  double alpha_val = CGAL::to_double(m_alpha);
-  double sq_dist = m_octree_ptr->squared_dist_to_finest(f_mid);
-  double dist = std::sqrt(sq_dist); // find the distance to the closest cell midpoint (at max refinement depth)
-
-  double edge_len = m_octree_ptr->finest_edge_length();
-  double d_min = 0.87 * edge_len; // concave area around max reph depth cell midpoint
-  double d_max = 15*alpha_val + d_min; // to ensure concave areas are not skipped, ensure a smooth transition to a bigger alpha from a distance for enough from the concave area
-
-  double local_alpha;
-
-  if (dist <= d_min) {
-    // Region 1: Inside or very close to the concave feature, keep normal alpha
-    local_alpha = alpha_val;
-  }
-  else if (dist >= d_max) {
-    // Region 2: Far enough away to use full alpha
-    local_alpha = 10 * alpha_val;
-  }
-  else {
-    // Region 3: Linear transition from 0.1*alpha to 1.0*alpha
-    // Interpolation factor (t) goes from 0.0 to 1.0
-    double t = (dist - d_min) / (d_max - d_min);
-    local_alpha = (alpha_val) + 10 * t * (alpha_val - 0.1 * alpha_val);
-  }
-
-  // check for traversibility based on the local alpha
-  const FT local_sq_alpha = FT(local_alpha * local_alpha);
-  return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
-}
+// // function to change is_traversible rules; now set local alpha's based on the approximated local feature size based on MAT
+// bool use_mat(const Facet& f) const
+// {
+//   const Cell_handle ch = f.first; // current cell
+//   const int i = f.second; // neighbor cell
+//
+//   // points on the triangle face that is checked for traversibility
+//   const Point_3& p0 = ch->vertex((i + 1) & 3)->point();
+//   const Point_3& p1 = ch->vertex((i + 2) & 3)->point();
+//   const Point_3& p2 = ch->vertex((i + 3) & 3)->point();
+//
+//   // construct midpoint of the triangle
+//   const Point_3 f_mid = mid_pt_of_triangle(p0, p1, p2);
+//
+//   // find nearest point in the MAT pc
+//   // (pc containing randomly sampled points on input with their associated approximated feature size computed using MAT --> masbcpp implementation)
+//   const double fs = m_fs_mat_ptr->nearest_feature_size(f_mid);
+//   const double fs_safe = (fs > 0.0) ? fs : 1e-12;
+//
+//   // based on the nearest approximated featuresize, set a local alpha value; smaller alpha for smaller feature sizes
+//   const double local_alpha = CGAL::to_double(m_alpha) * std::pow(fs_safe, 0.85); // alpha*3 for ref_depth=1, alpha*0.3 for ref_depth=9
+//   const FT local_sq_alpha = FT(local_alpha * local_alpha);
+//
+//   // return bool of if the face is traversible or not based on the local alpha
+//   return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);}
+//
+//   // function to change is_traversible rules; now set local alpha's based on proximity of sharp concave edge based on adaptive octree
+// bool use_octree(const Facet& f) const{
+//   const Cell_handle ch = f.first; // current cell
+//   const int i = f.second; // neighboring cell
+//
+//   // points on the triangle face that is checked for traversibility
+//   const Point_3& p0 = ch->vertex((i + 1) & 3)->point();
+//   const Point_3& p1 = ch->vertex((i + 2) & 3)->point();
+//   const Point_3& p2 = ch->vertex((i + 3) & 3)->point();
+//
+//   // construct midpoint of the triangle
+//   const Point_3 f_mid = mid_pt_of_triangle(p0, p1, p2);
+//
+//   // adaptive octree is made, which splits a cell into 8 children if a sharp concave edge is found.
+//   // the cells at max refinement depth indicate the regions where a sharp concave corner is present.
+//   double alpha_val = CGAL::to_double(m_alpha);
+//   double sq_dist = m_octree_ptr->squared_dist_to_finest(f_mid);
+//   double dist = std::sqrt(sq_dist); // find the distance to the closest cell midpoint (at max refinement depth)
+//
+//   double edge_len = m_octree_ptr->finest_edge_length();
+//   double d_min = 0.87 * edge_len; // concave area around max reph depth cell midpoint
+//   double d_max = 15*alpha_val + d_min; // to ensure concave areas are not skipped, ensure a smooth transition to a bigger alpha from a distance for enough from the concave area
+//
+//   double local_alpha;
+//
+//   if (dist <= d_min) {
+//     // Region 1: Inside or very close to the concave feature, keep normal alpha
+//     local_alpha = alpha_val;
+//   }
+//   else if (dist >= d_max) {
+//     // Region 2: Far enough away to use full alpha
+//     local_alpha = 10 * alpha_val;
+//   }
+//   else {
+//     // Region 3: Linear transition from 0.1*alpha to 1.0*alpha
+//     // Interpolation factor (t) goes from 0.0 to 1.0
+//     double t = (dist - d_min) / (d_max - d_min);
+//     local_alpha = (alpha_val) + 10 * t * (alpha_val - 0.1 * alpha_val);
+//   }
+//
+//   // check for traversibility based on the local alpha
+//   const FT local_sq_alpha = FT(local_alpha * local_alpha);
+//   return less_squared_radius_of_min_empty_sphere(local_sq_alpha, f, m_tr);
+// }
 
   // function which checks if face midpoint is too far from input
 bool too_far_from_input(const Facet& f) const {
@@ -1114,76 +1114,30 @@ bool too_far_from_input(const Facet& f) const {
   return true;
 }
 
-  // function to check if a face is traversible
+  // function to check if a face is traversable
 bool is_traversable(const Facet& f) const
 {
-  bool check_face_distance_from_input = m_check_face_distance_from_input; // check face distance from input if max_distance_to_input is provided
-  // A) Default CGAL behavior: when neither MAT nor Octree is used
-  if ((!m_use_mat || !m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr))
-  {
-    // Alpha condition
-    bool traversable = less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
+  // check if the tau criterion will be used
+  bool use_tau_criterion = m_check_face_distance_from_input;
 
-    if (check_face_distance_from_input)
+  // check if the facet is alpha_traversable
+  bool alpha_traversable = less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
+
+  if (use_tau_criterion)
     {
-      // alpha-traversability criterion
-      if (traversable) {
-        return traversable;
+      if (alpha_traversable) {
+        // if the tau criterion will be used, but the facet is already alpha traversable, just return that the facet is traversable
+        return alpha_traversable;
       }
-      // only check if a face midpoint is too far from input if face is not alpha-traversable
-        // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
-      // Tau-traversability criterion
-      traversable = too_far_from_input(f);
+      // however, if the facet is not alpha traversable, check if the facet is tau traversable
+      // a facet is tau traversable if the facets midpoint is farther from the input than the treshold 'tau'
+      bool tau_traversable = too_far_from_input(f);
+    // return if the facet is tau traversable or not
+    return tau_traversable;
     }
 
-    return traversable;
-  }
-
-  // A) MAT-based behavior: when MAT is used
-  if ((m_use_mat || m_fs_mat_ptr) && (!m_use_octree || !m_octree_ptr)) {
-    bool traversable = use_mat(f); // check if face is traversable using MAT implementation
-    if (check_face_distance_from_input)
-    {
-      if (traversable) {
-        return traversable;
-      }
-      // only check if a face midpoint is too far from input if face is not alpha-traversable
-      // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
-      // Tau-traversability criterion
-      traversable = too_far_from_input(f);
-    }
-      return traversable;
-  }
-
-  // B) Octree-based behavior: when Octree is used but no MAT
-  if ((!m_use_mat || !m_fs_mat_ptr) && (m_use_octree || m_octree_ptr)) {
-    bool traversable = use_octree(f);
-    if (check_face_distance_from_input)
-    {
-      if (traversable) {
-        return traversable;
-      }
-      // only check if a face midpoint is too far from input if face is not alpha-traversable
-      // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
-      // Tau-traversability criterion
-      traversable = too_far_from_input(f);
-    }
-    return traversable;
-  }
-
-  // C) Default case: safety; use default case if traversability has not been checked yet
-  bool traversable = less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
-  if (check_face_distance_from_input)
-  {
-    if (traversable) {
-      return traversable;
-    }
-    // only check if a face midpoint is too far from input if face is not alpha-traversable
-    // if face is smaller than alpha ball, but face mid is too far from input return that the face is traversable, else face is not traversable
-    // Tau-traversability criterion
-    traversable = too_far_from_input(f);
-  }
-  return traversable;
+    // if the tau criterion will not be used, just as in the original algorithm, return if the facet is alpha traversable or not
+    return alpha_traversable;
 }
 
   // =================================== HELPERS FOR MODIFIED COMPUTE_STEINER_POINT FUNCTION ================================
