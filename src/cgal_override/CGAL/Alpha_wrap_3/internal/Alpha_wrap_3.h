@@ -195,7 +195,7 @@ protected:
 
   // Default parameter: absolute maximum distance to input
   double m_max_distance_to_input = -1.;
-  bool m_check_face_distance_from_input = false;
+  bool m_check_face_distance_from_input = false; // wil tau criterion be used?
 
   FT m_alpha = FT(-1), m_sq_alpha = FT(-1);
   FT m_offset = FT(-1), m_sq_offset = FT(-1);
@@ -1141,52 +1141,6 @@ bool is_traversable(const Facet& f) const
 }
 
   // =================================== HELPERS FOR MODIFIED COMPUTE_STEINER_POINT FUNCTION ================================
-// ToDo not used yet, but maybe eventually optimize best place on triangle computation
-  bool compute_edge_optimum(const Point_3& a,
-                            const Point_3& b,
-                            const Point_3& edge_mid,
-                            Point_3& p_opt) const
-{
-  typename Geom_traits::Construct_vector_3 vector =
-      geom_traits().construct_vector_3_object();
-  auto cross = geom_traits().construct_cross_product_vector_3_object();
-  auto sq_length = geom_traits().compute_squared_length_3_object();
-
-  const Point_3 closest_a = m_oracle.closest_point(a);
-  const Point_3 closest_b = m_oracle.closest_point(b);
-
-  const Vector_3 e  = vector(a, b);
-  const Vector_3 na = vector(a, closest_a);
-  const Vector_3 nb = vector(b, closest_b);
-
-  const double len_e  = std::sqrt(CGAL::to_double(sq_length(e)));
-  const double len_na = std::sqrt(CGAL::to_double(sq_length(na)));
-  const double len_nb = std::sqrt(CGAL::to_double(sq_length(nb)));
-
-  const double eps = 1e-12;
-  if (len_e < eps || len_na < eps || len_nb < eps) {
-    p_opt = edge_mid;
-    return false;
-  }
-
-  double sin_a =
-      std::sqrt(CGAL::to_double(sq_length(cross(na, e)))) / (len_na * len_e);
-  double sin_b =
-      std::sqrt(CGAL::to_double(sq_length(cross(nb, e)))) / (len_nb * len_e);
-
-  sin_a = std::max(0.0, std::min(1.0, sin_a));
-  sin_b = std::max(0.0, std::min(1.0, sin_b));
-
-  const double denom = sin_a + sin_b;
-  if (denom < eps) {
-    p_opt = edge_mid;
-    return false;
-  }
-
-  const double t = sin_b / denom;
-  p_opt = a + t * e;
-  return true;
-}
 
   // approximate furthest point on triangle
   // ToDo come up with a better method to approximate te furthest point on a triangle to an input geometry
@@ -1201,24 +1155,23 @@ bool is_traversable(const Facet& f) const
   const Point_3 face_mid = mid_pt_of_triangle(pt1, pt2, pt3);
 
   // ToDo; make a better approximation for furthest point on triangle, e.g. compute a edge optimum in stead of now just an edge mid
-  // ToDo: Ensure this furthest distance is at least offset away from input, otherwise steiner points can be on inner structures
 
-  // Compute midpoints on triangle edges
+  // Compute midpoints on facets edges
   const Point_3 edge_mid01 = construct_midpoint(pt1, pt2);
   const Point_3 edge_mid12 = construct_midpoint(pt2, pt3);
   const Point_3 edge_mid20 = construct_midpoint(pt3, pt1);
 
-  // Closest points on input for the 3 edge midpoints
-  const Point_3 closest_pt01 = m_oracle.closest_point(edge_mid01);
+  // Find the closest points on the input from the facets' edge midpoints
+  const Point_3 closest_pt01 = m_oracle.closest_point(edge_mid01); // reuse m_oracle.closest_point() from original CGAL implementation
   const Point_3 closest_pt12 = m_oracle.closest_point(edge_mid12);
   const Point_3 closest_pt20 = m_oracle.closest_point(edge_mid20);
 
-  // Squared distances to input
+  // Compute the distances from the edge midpoints to its closest point on the input
   const FT d_mid01_sq = sq_dist(edge_mid01, closest_pt01);
   const FT d_mid12_sq = sq_dist(edge_mid12, closest_pt12);
   const FT d_mid20_sq = sq_dist(edge_mid20, closest_pt20);
 
-  // Choose the edge midpoint farthest from the input
+  // Now find the edge midpoint furthest from the input
   Point_3 edge_mid = edge_mid01;
   FT max_d_sq = d_mid01_sq;
 
@@ -1233,19 +1186,29 @@ bool is_traversable(const Facet& f) const
     max_d_sq = d_mid20_sq;
     edge_mid = edge_mid20;
   }
+  // edge_mid is now the facets edge midpoint that is furthest from the input
 
-  // Move slightly from the selected edge midpoint toward the triangle centroid.
+  //---------------------5% shift towards facets centroid-----------------------
+  // The next step (5% shift of edge midpoint towards its facets centroid) is not necessary for algorithm to work nor for maintaining its theoretical guarentees
+  // However, this tiny movement most likely will bring the point closer to the circumcenter of the neighboring cell (K_cn)
+  // Which will in the end result in a higher change the Steiner Point construction using R3,
+  // will be far enough from earlier inserted Steiner points (and the algorithm thus does not have to fall back on Steiner Point construction methods R1 & R2)
+
+  // R3 is specifically designed for placing Steiner points directly at concave features on the offset surface for a tau_traversable facet,
+  // And thus for a tau_traversable facet a Steiner point construction using R3 will be more ideal than R1 or R2
   const Vector_3 edge_to_centroid = vector(edge_mid, face_mid);
   face_pt = translate(edge_mid, scale(edge_to_centroid, FT(1) / FT(20)));
+  //-----------------------------------------------------------------------------
 
   // Check whether the constructed point is farther than m_offset from the input, and thus outside the offset region.
+  // This is important for preventing inner structures from being wrapped.
   const Point_3 closest_face_pt = m_oracle.closest_point(face_pt);
   const FT d_face_sq = sq_dist(face_pt, closest_face_pt);
 
   return d_face_sq > CGAL::square(FT(m_offset));
 }
 
-    // normal steiner computation
+    // normal steiner computation --> same as original algorithm
   bool compute_steiner_point_normal(const Cell_handle ch,
                              const Cell_handle neighbor,
                              Point_3& steiner_point) const
@@ -1294,6 +1257,7 @@ bool is_traversable(const Facet& f) const
     {
       const Point_3& ch_cc = circumcenter(ch);
 
+      // ------------------Steiner point construction using R1------------------
       // If the voronoi edge intersects the offset, the steiner point is the first intersection
       if(m_oracle.first_intersection(ch_cc, neighbor_cc, steiner_point, m_offset))
       {
@@ -1305,6 +1269,7 @@ bool is_traversable(const Facet& f) const
     }
 
     Tetrahedron_with_outside_info<Geom_traits> tet(neighbor, geom_traits());
+  // ------------------Steiner point construction using R2------------------
     if(m_oracle.do_intersect(tet))
     {
       // steiner point is the closest point on input from cell centroid with offset
@@ -1385,77 +1350,72 @@ bool is_traversable(const Facet& f) const
     CGAL_assertion(!m_oracle.do_intersect(ch_cc_offset_ball));
 
   // ToDo; This should be implemented nicer, but the idea is that only the modified method of steiner insertion is used for small faces. But now a bit double.
-  // get points of current face
+  // get points of the facet
   Point_3 pts[3];
   int fi = ch->index(neighbor);
   for(int j=0, k=0; j<4; ++j) {
     if(j != fi) pts[k++] = ch->vertex(j)->point();
   }
 
-  // construct the face
+  // construct the facet
   Facet f = Facet(ch, fi);
 
-  const bool traversable = less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
-  // normal steiner computation for big enough faces
-  if (traversable) {
+  // check if the facet is alpha traversable --> if so, use original Steiner point construction methods (R1 and R2)
+  const bool alpha_traversable = less_squared_radius_of_min_empty_sphere(m_sq_alpha, f, m_tr);
+  if (alpha_traversable) {
     return compute_steiner_point_normal(ch, neighbor, steiner_point);
-
   }
 
-  // for small faces, use modified steiner point insertion
+  // else, try to construct a Steiner point using R3
+  // if construction using R3 is unsuccessful, fall back to R1 and R2
     Tetrahedron_with_outside_info<Geom_traits> tet(neighbor, geom_traits());
+  // for termination guarantee, neighboring tetrahedron must intersect with the input for a successful R3 Steiner Point construction
     if(m_oracle.do_intersect(tet))
   {
     Point_3 face_pt;
 
     bool is_outside_offset_region = compute_furthest_point_on_facet_to_input(pts[0],pts[1],pts[2], face_pt);
 
-    // only use insertion rule R3 if the approximated furthest point on the face from the input is outside the offset region
+    // only use insertion rule R3 if the approximated furthest point on the facet from the input is outside the offset region
     if (!is_outside_offset_region) {
+      // R3 unsuccessful because the furthest edge midpoint, must lie outside the offset region to prevent inner structures from being wrapped
       return compute_steiner_point_normal(ch, neighbor, steiner_point);
     }
 
     const Point_3 closest_pt = m_oracle.closest_point(neighbor_cc);
     CGAL_assertion(closest_pt != neighbor_cc);
 
-    // // Guard against a degenerate segment: first_intersection() normalizes (t - s).
-    // // If face_pt and closest_pt are (near-)identical, that normalization can divide by zero.
-    // const FT sq_face_to_closest = sq_dist(face_pt, closest_pt);
-    // const FT min_sq_face_to_closest = square(FT(1e-12) * m_offset);
-    // if(sq_face_to_closest <= min_sq_face_to_closest) {
-    //   return compute_steiner_point_normal(ch, neighbor, steiner_point);
-    // }
-
     // if moving from furthest triangle point to closest point on input (from neighbor_cc), gives an intersection, first intersection is steiner point
     Point_3 steiner_test_point;
-    if(m_oracle.first_intersection(face_pt, closest_pt, steiner_test_point, m_offset))
+    if(m_oracle.first_intersection(face_pt, closest_pt, steiner_test_point, m_offset)) // reuse m_oracle.first_intersection() from original CGAL implementation
     {
+      // test if the R3 constructed steiner point is far enough away from all earlier inserted Steiner Points
+      // if new point is far enough away, Steiner point construction using R3 method is successful!
+      // else fall back to Steiner Point construction methods R1 and R2
       if (far_enough_from_other_points(steiner_test_point)) {
-        // std::cout << "👍🏼steiner_test_point " << steiner_test_point << " , is far enough from other points!" << std::endl;
+        // std::cout << "steiner_test_point " << steiner_test_point << " , is far enough from other points!" << std::endl;
         steiner_point = steiner_test_point;
         return true;
       }
-      // std::cout << "🤯not far enough, so using normal steiner point placement!" << std::endl;
+      // std::cout << "not far enough, so using normal steiner point placement!" << std::endl;
       return compute_steiner_point_normal(ch, neighbor, steiner_point);
     }
   }
-  // if no steiner point is successfully computed, compute it using the normal way
+  // if no steiner point is successfully computed, compute it using R1 and R2
   return compute_steiner_point_normal(ch, neighbor, steiner_point);
   }
 
-    // modified steiner computation
   bool compute_steiner_point(const Cell_handle ch,
                              const Cell_handle neighbor,
                              Point_3& steiner_point) const
   {
-    // return compute_steiner_point_normal(ch, neighbor, steiner_point);
     const bool mod_steiner_computation = m_check_face_distance_from_input; // only use modified steiner point placement if parameter max_distance_to_input is used
 
-  // use normal steiner computation
+  // use original steiner point computation methods, if the tau criterion will not be used
     if (!mod_steiner_computation) {
       return compute_steiner_point_normal(ch, neighbor, steiner_point);
     }
-  // else use modified implementation --> with this method, for many cases still the 'compute_steiner_point_normal' is used
+  // else use modified implementation --> note that, with this method, for many cases still the 'compute_steiner_point_normal' is used
   return compute_steiner_point_modified(ch, neighbor, steiner_point);
   }
 
@@ -1467,7 +1427,11 @@ private:
     HAS_INFINITE_NEIGHBOR, // the cell incident to the mirrored facet is infinite (permissive)
     SCAFFOLDING, // incident to a SEED or BBOX vertex (permissive)
     TRAVERSABLE,
-    IS_ZOMBIE_CELL, // with new traversability rules --> empty labeled inside cells may exist at the boundary, ensure these zombie cells still get flood filled
+    // For safety reasons, some cells will not be carved, even though they do not contain the input and are connected to outside cells.
+    // This safety constrained is set to prevent inner structeres from being wrapped in a next step
+    // However, if its neighboring cells all are not traversable anymore and thus no next steps will take place, carving these cells would be safe
+    // We call these cells zombie cells --> note that this is not safe to use in combination with
+    IS_ZOMBIE_CELL,
   };
 
   inline const char* get_status_message(const Facet_status status)
@@ -1613,6 +1577,7 @@ public:
     }
 
     if(is_empty_cell(nh) && would_expose_non_traversable_facet(ch, id, nh))
+      // if all new exposed facets would be non-traversable and the tetrahedron cell is empty --> carve through gate
       return Facet_status::IS_ZOMBIE_CELL;
 
         // std::cout << "👼🏼👼🏼👼🏼face is NOT traversable, and neighbor cell contains input!👼🏼👼🏼👼🏼" << std::endl;
