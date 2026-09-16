@@ -31,28 +31,28 @@
 
 namespace CGAL {
     namespace internal_np {
-        struct mat_path_t {};
-        struct octree_t {};
+        // struct mat_path_t {};
+        // struct octree_t {};
         struct max_distance_to_input_t {};
         // Tag object, same style as internal_np::geom_traits, etc.
-        static const mat_path_t mat_path = mat_path_t();
-        static const octree_t octree = octree_t();
+        // static const mat_path_t mat_path = mat_path_t();
+        // static const octree_t octree = octree_t();
         static const max_distance_to_input_t max_distance_to_input = max_distance_to_input_t();
     }
 
     namespace parameters {
         // Free function so you can write CGAL::parameters::mat_path("file.ply")
-        inline CGAL::Named_function_parameters<std::string, internal_np::mat_path_t>
-        mat_path(const std::string& p)
-        {
-            return CGAL::Named_function_parameters<std::string, internal_np::mat_path_t>(p);
-        }
-
-        inline CGAL::Named_function_parameters<std::vector<CGAL::Bbox_3>, internal_np::octree_t>
-        octree(const std::vector<CGAL::Bbox_3>& cells)
-        {
-            return CGAL::Named_function_parameters<std::vector<CGAL::Bbox_3>, internal_np::octree_t>(cells);
-        }
+        // inline CGAL::Named_function_parameters<std::string, internal_np::mat_path_t>
+        // mat_path(const std::string& p)
+        // {
+        //     return CGAL::Named_function_parameters<std::string, internal_np::mat_path_t>(p);
+        // }
+        //
+        // inline CGAL::Named_function_parameters<std::vector<CGAL::Bbox_3>, internal_np::octree_t>
+        // octree(const std::vector<CGAL::Bbox_3>& cells)
+        // {
+        //     return CGAL::Named_function_parameters<std::vector<CGAL::Bbox_3>, internal_np::octree_t>(cells);
+        // }
 
         inline CGAL::Named_function_parameters<double,
                                                internal_np::max_distance_to_input_t>

@@ -33,8 +33,6 @@ using Tree        = CGAL::AABB_tree<AABB_traits>;
 #include "val3dity.h"
 #include "alpha_wrap.h"
 #include "edge_refinement.h"
-#include "octree.h"
-#include "MAT.h"
 #include "hausdorff.h"
 #include "resuls.h"
 

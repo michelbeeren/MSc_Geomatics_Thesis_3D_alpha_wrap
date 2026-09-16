@@ -29,10 +29,6 @@
 #endif
 
 #include <CGAL/license/Alpha_wrap_3.h>
-#include <CGAL/Alpha_wrap_3/internal/Feature_size_MAT.h>
-// #include <CGAL/Alpha_wrap_3/internal/Octree_refinement_depth.h>
-#include <CGAL/Alpha_wrap_3/internal/is_concave.h>
-#include "../../../../octree.h"
 
 #include <CGAL/Alpha_wrap_3/internal/Alpha_wrap_triangulation_cell_base_3.h>
 #include <CGAL/Alpha_wrap_3/internal/Alpha_wrap_triangulation_vertex_base_3.h>

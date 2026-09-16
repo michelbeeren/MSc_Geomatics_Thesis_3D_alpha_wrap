@@ -13,21 +13,21 @@ include_directories(BEFORE
 find_package(CGAL REQUIRED)
 
 add_executable(alpha_wrap
-        src/main.cpp
-        src/val3dity.cpp
-        src/val3dity.h
-        src/alpha_wrap.cpp
-        src/alpha_wrap.h
-        src/edge_refinement.cpp
-        src/edge_refinement.h
-        src/octree.cpp
-        src/octree.h
-        src/MAT.cpp
-        src/MAT.h
-        src/hausdorff.cpp
-        src/hausdorff.h
-        src/resuls.cpp
-        src/resuls.h
+        src/Thesis/main.cpp
+        src/Thesis/val3dity.cpp
+        src/Thesis/val3dity.h
+        src/Thesis/alpha_wrap.cpp
+        src/Thesis/alpha_wrap.h
+        src/Thesis/edge_refinement.cpp
+        src/Thesis/edge_refinement.h
+        src/Thesis/octree.cpp
+        src/Thesis/octree.h
+        src/Thesis/MAT.cpp
+        src/Thesis/MAT.h
+        src/Thesis/hausdorff.cpp
+        src/Thesis/hausdorff.h
+        src/Thesis/resuls.cpp
+        src/Thesis/resuls.h
 )
 
 add_executable(alpha_wrap_cli
@@ -35,6 +35,18 @@ add_executable(alpha_wrap_cli
         src/cli/helper_files/alpha_wrapping.h
         src/cli/helper_files/val3dity.h
         src/cli/helper_files/hausdorff.h
+)
+
+add_executable(example_usage
+        src/example_usage.cpp
+        src/Thesis/val3dity.cpp
+        src/Thesis/val3dity.h
+        src/Thesis/alpha_wrap.cpp
+        src/Thesis/alpha_wrap.h
+        src/Thesis/octree.cpp
+        src/Thesis/octree.h
+        src/Thesis/hausdorff.cpp
+        src/Thesis/hausdorff.h
 )
 
 # EXTRA HARD FORCE: put -Ioverride explicitly at the start of compile flags --> probably not necessary
@@ -45,6 +57,7 @@ add_executable(alpha_wrap_cli
 
 target_link_libraries(alpha_wrap PRIVATE CGAL::CGAL)
 target_link_libraries(alpha_wrap_cli PRIVATE CGAL::CGAL)
+target_link_libraries(example_usage PRIVATE CGAL::CGAL)
 
 # ---------------- val3dity ----------------
 set(VAL3DITY_EXECUTABLE "" CACHE FILEPATH "Path to the val3dity executable")
@@ -62,6 +75,9 @@ if(VAL3DITY_EXECUTABLE)
             VAL3DITY_PATH="${VAL3DITY_EXECUTABLE}"
     )
     target_compile_definitions(alpha_wrap_cli PRIVATE
+            VAL3DITY_PATH="${VAL3DITY_EXECUTABLE}"
+    )
+    target_compile_definitions(example_usage PRIVATE
             VAL3DITY_PATH="${VAL3DITY_EXECUTABLE}"
     )
 else()
