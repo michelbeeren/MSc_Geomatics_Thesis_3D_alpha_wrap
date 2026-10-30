@@ -1,5 +1,7 @@
 # External git repos
 City4CFD/
+external/
+src/Thesis/
 
 # Data files (do not commit)
 data/
