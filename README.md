@@ -8,7 +8,7 @@ The extension retains the guarantees of the original algorithm: termination, str
 
 ![Comparison of the original and tau-extended 3D Alpha Wrap](images/comparison_original_vs_tau.png)
 
-The following 2D schematics illustrate the difference between the two algorithms.
+The following 2D schematics illustrate the difference between the two algorithms. For a detailed explanation of how the extension works, see the [paper](Paper_alpha_wrap.pdf).
 
 <table width="100%">
   <tr>
