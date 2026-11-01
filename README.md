@@ -8,6 +8,16 @@ The extension retains the guarantees of the original algorithm: termination, str
 
 ![Comparison of the original and tau-extended 3D Alpha Wrap](images/comparison_original_vs_tau.png)
 
+The following 2D schematics illustrate the difference between the two algorithms.
+
+<img src="images/original_alpha_wrap.svg" alt="2D schematic of the original 3D Alpha Wrap" width="700" height="200">
+
+*Original algorithm (alpha-traversability, insertion rules R1 and R2): decreasing `alpha` improves the approximation of the concave feature, but also increases refinement elsewhere.*
+
+<img src="images/tau_extended_alpha_wrap.svg" alt="2D schematic of the tau-extended 3D Alpha Wrap" width="353" height="200">
+
+*Tau-extended algorithm: `tau` triggers additional local refinement, while insertion rule R3 places Steiner points more directly near the concave feature, allowing a closer approximation even with a larger `alpha`.*
+
 ## Data formats
 
 Like the original CGAL 3D Alpha Wrap, the extended algorithm accepts **triangle meshes, triangle soups, and point sets**. These are geometry types passed to the C++ interface; the file format depends on how the data is loaded.
