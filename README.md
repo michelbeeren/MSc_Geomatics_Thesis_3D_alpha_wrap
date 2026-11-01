@@ -12,8 +12,8 @@ The following 2D schematics illustrate the difference between the two algorithms
 
 <table width="100%">
   <tr>
-    <td width="66.47%"><img src="images/original_alpha_wrap.svg" alt="2D schematic of the original 3D Alpha Wrap" width="100%"></td>
-    <td width="33.53%"><img src="images/tau_extended_alpha_wrap.svg" alt="2D schematic of the tau-extended 3D Alpha Wrap" width="100%"></td>
+    <td width="66.47%"><img src="images/original_alpha_wrap_schematic.png" alt="2D schematic of the original 3D Alpha Wrap" width="100%"></td>
+    <td width="33.53%"><img src="images/tau_extended_alpha_wrap_schematic.png" alt="2D schematic of the tau-extended 3D Alpha Wrap" width="100%"></td>
   </tr>
 </table>
 
